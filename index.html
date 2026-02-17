@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mumbai Weather Analytics | 1991-2017</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Leaflet for Real Maps -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- D3.js -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+<body>
+    <!-- Background Effects -->
+    <div class="bg-effects">
+        <div class="gradient-orb orb-1"></div>
+        <div class="gradient-orb orb-2"></div>
+        <div class="gradient-orb orb-3"></div>
+        <div class="noise-overlay"></div>
+    </div>
+
+    <!-- Sidebar Navigation -->
+    <nav class="sidebar">
+        <div class="logo">
+            <div class="logo-icon">🌦️</div>
+            <h1>MUMBAI<br><span>WEATHER</span></h1>
+        </div>
+        
+        <div class="nav-section">
+            <div class="nav-label">ANALYSIS MODULES</div>
+            <a href="#overview" class="nav-item active" data-target="overview">
+                <span class="nav-icon">📊</span>
+                <span class="nav-text">Overview</span>
+            </a>
+            <a href="#temperature" class="nav-item" data-target="temperature">
+                <span class="nav-icon">🌡️</span>
+                <span class="nav-text">Temperature Trends</span>
+            </a>
+            <a href="#spatial" class="nav-item" data-target="spatial">
+                <span class="nav-icon">🗺️</span>
+                <span class="nav-text">Spatial Patterns</span>
+            </a>
+            <a href="#monsoon" class="nav-item" data-target="monsoon">
+                <span class="nav-icon">🌧️</span>
+                <span class="nav-text">Monsoon Analysis</span>
+            </a>
+            <a href="#interactive" class="nav-item" data-target="interactive">
+                <span class="nav-icon">🎯</span>
+                <span class="nav-text">Interactive Map</span>
+            </a>
+            <a href="#correlation" class="nav-item" data-target="correlation">
+                <span class="nav-icon">🔗</span>
+                <span class="nav-text">Correlations</span>
+            </a>
+        </div>
+
+        <div class="sidebar-footer">
+            <div class="data-info">
+                <div class="info-label">DATASET PERIOD</div>
+                <div class="info-value">1991 - 2017</div>
+            </div>
+            <div class="data-info">
+                <div class="info-label">OBSERVATIONS</div>
+                <div class="info-value">9,800+</div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Header -->
+        <header class="page-header">
+            <div class="header-content">
+                <h2 class="page-title">Climate Intelligence Dashboard</h2>
+                <p class="page-subtitle">27 Years of Meteorological Data Analysis</p>
+            </div>
+            <div class="header-stats">
+                <div class="stat-card">
+                    <div class="stat-value" id="avgTemp">--</div>
+                    <div class="stat-label">Avg Temperature</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="avgHumidity">--</div>
+                    <div class="stat-label">Avg Humidity</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="maxTemp">--</div>
+                    <div class="stat-label">Max Recorded</div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Overview Section -->
+        <section id="overview" class="content-section active">
+            <div class="section-header">
+                <h3 class="section-title">
+                    <span class="title-accent">01</span>
+                    Project Overview
+                </h3>
+                <p class="section-description">Comprehensive meteorological analysis of Mumbai's climate patterns</p>
+            </div>
+            
+            <div class="overview-grid">
+                <div class="overview-card">
+                    <div class="card-icon">🎯</div>
+                    <h4>Mission</h4>
+                    <p>Transform 27 years of raw meteorological data into actionable insights for urban planners, agricultural stakeholders, and public health officials.</p>
+                </div>
+                <div class="overview-card">
+                    <div class="card-icon">📍</div>
+                    <h4>Location</h4>
+                    <p>Mumbai - India's financial capital, coastal metropolis with 20+ million inhabitants experiencing tropical climate with distinct monsoon seasons.</p>
+                </div>
+                <div class="overview-card">
+                    <div class="card-icon">🔬</div>
+                    <h4>Parameters</h4>
+                    <p>Temperature (min/max/mean), Precipitation, Humidity, Wind Speed, Atmospheric Pressure, Cloud Cover, and more.</p>
+                </div>
+                <div class="overview-card">
+                    <div class="card-icon">👥</div>
+                    <h4>Stakeholders</h4>
+                    <p>Urban planners, farmers, tourism operators, emergency services, and general public seeking weather intelligence.</p>
+                </div>
+            </div>
+
+            <div class="team-section">
+                <h4 class="team-title">Research Team</h4>
+                <div class="team-grid">
+                    <div class="team-member">
+                        <div class="member-id">2024111033</div>
+                        <div class="member-name">Yakkala Viswanadha Kartikeya</div>
+                    </div>
+                    <div class="team-member">
+                        <div class="member-id">2024101067</div>
+                        <div class="member-name">Mule Mohan Venkata Santosh Reddy</div>
+                    </div>
+                    <div class="team-member">
+                        <div class="member-id">2024111004</div>
+                        <div class="member-name">Kandagatla Akshith</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Temperature Trends Section -->
+        <section id="temperature" class="content-section">
+            <div class="section-header">
+                <h3 class="section-title">
+                    <span class="title-accent">02</span>
+                    Temperature Evolution Analysis
+                </h3>
+                <p class="section-description">How have temperature patterns evolved over 27 years?</p>
+            </div>
+            
+            <div class="viz-container">
+                <div class="viz-controls">
+                    <button class="control-btn active" data-view="yearly">Yearly Trend</button>
+                    <button class="control-btn" data-view="seasonal">Seasonal</button>
+                    <button class="control-btn" data-view="decadal">Decadal</button>
+                </div>
+                <div id="temperatureChart" class="chart-area"></div>
+                <div class="chart-insights">
+                    <div class="insight-card">
+                        <span class="insight-icon">📈</span>
+                        <div>
+                            <div class="insight-title">Trend Analysis</div>
+                            <div class="insight-text">Observable warming trend over the analysis period</div>
+                        </div>
+                    </div>
+                    <div class="insight-card">
+                        <span class="insight-icon">🔥</span>
+                        <div>
+                            <div class="insight-title">Urban Heat Island</div>
+                            <div class="insight-text">Rising temperatures indicate climate change impacts</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Spatial Patterns Section -->
+        <section id="spatial" class="content-section">
+            <div class="section-header">
+                <h3 class="section-title">
+                    <span class="title-accent">03</span>
+                    Spatial Distribution Analysis
+                </h3>
+                <p class="section-description">Geographic patterns across Mumbai's zones</p>
+            </div>
+            
+            <div class="viz-container">
+                <div class="viz-controls">
+                    <button class="control-btn active" data-metric="temperature">Temperature</button>
+                    <button class="control-btn" data-metric="humidity">Humidity</button>
+                    <button class="control-btn" data-metric="pressure">Pressure</button>
+                </div>
+                <div class="spatial-grid">
+                    <div id="spatialMap" class="chart-area large"></div>
+                    <div id="zoneComparison" class="chart-area"></div>
+                </div>
+                <div class="chart-insights">
+                    <div class="insight-card">
+                        <span class="insight-icon">🏖️</span>
+                        <div>
+                            <div class="insight-title">Coastal Effect</div>
+                            <div class="insight-text">South Mumbai shows 2-3°C cooler than inland areas</div>
+                        </div>
+                    </div>
+                    <div class="insight-card">
+                        <span class="insight-icon">🌆</span>
+                        <div>
+                            <div class="insight-title">Urban Zones</div>
+                            <div class="insight-text">Western/Eastern suburbs exhibit higher variability</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Monsoon Analysis Section -->
+        <section id="monsoon" class="content-section">
+            <div class="section-header">
+                <h3 class="section-title">
+                    <span class="title-accent">04</span>
+                    Monsoon Rainfall Patterns
+                </h3>
+                <p class="section-description">80% of annual rainfall occurs during monsoon season (June-September)</p>
+            </div>
+            
+            <div class="viz-container">
+                <div class="monsoon-grid">
+                    <div id="rainfallYearly" class="chart-area"></div>
+                    <div id="rainfallMonthly" class="chart-area"></div>
+                    <div id="rainfallVariability" class="chart-area full-width"></div>
+                </div>
+                <div class="chart-insights">
+                    <div class="insight-card">
+                        <span class="insight-icon">💧</span>
+                        <div>
+                            <div class="insight-title">Extreme Years</div>
+                            <div class="insight-text">1994, 2005 - Heavy rainfall | 2002 - Severe drought</div>
+                        </div>
+                    </div>
+                    <div class="insight-card">
+                        <span class="insight-icon">📊</span>
+                        <div>
+                            <div class="insight-title">Variability</div>
+                            <div class="insight-text">High year-to-year variation impacts water management</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Interactive Map Section -->
+        <section id="interactive" class="content-section">
+            <div class="section-header">
+                <h3 class="section-title">
+                    <span class="title-accent">05</span>
+                    Interactive Climate Explorer
+                </h3>
+                <p class="section-description">Explore weather conditions by date and time</p>
+            </div>
+            
+            <div class="viz-container">
+                <div class="map-controls">
+                    <div class="control-group">
+                        <label>Select Date</label>
+                        <input type="date" id="mapDate" value="2009-10-01">
+                    </div>
+                    <div class="control-group">
+                        <label>Select Time</label>
+                        <input type="time" id="mapTime" value="12:00">
+                    </div>
+                    <button class="control-btn primary" id="updateMap">Update Map</button>
+                </div>
+                <div id="interactiveMap" class="chart-area large"></div>
+                <div class="map-legend">
+                    <div class="legend-title">Weather Metrics</div>
+                    <div class="legend-items">
+                        <div class="legend-item">
+                            <span class="legend-color" style="background: #00d9ff"></span>
+                            <span>Temperature</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-color" style="background: #ff6b9d"></span>
+                            <span>Humidity</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-color" style="background: #ffd700"></span>
+                            <span>Pressure</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Correlation Analysis Section -->
+        <section id="correlation" class="content-section">
+            <div class="section-header">
+                <h3 class="section-title">
+                    <span class="title-accent">06</span>
+                    Multi-Variable Correlation Matrix
+                </h3>
+                <p class="section-description">Relationships between meteorological parameters</p>
+            </div>
+            
+            <div class="viz-container">
+                <div id="correlationMatrix" class="chart-area large"></div>
+                <div class="chart-insights">
+                    <div class="insight-card">
+                        <span class="insight-icon">🔗</span>
+                        <div>
+                            <div class="insight-title">Strong Correlations</div>
+                            <div class="insight-text">Temperature-Humidity inverse relationship evident</div>
+                        </div>
+                    </div>
+                    <div class="insight-card">
+                        <span class="insight-icon">📉</span>
+                        <div>
+                            <div class="insight-title">Pressure Patterns</div>
+                            <div class="insight-text">Atmospheric pressure shows seasonal dependencies</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="script.js"></script>
+</body>
+</html>
