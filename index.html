@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,15 +8,18 @@
     <link rel="stylesheet" href="styles.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+
     <!-- Leaflet for Real Maps -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    
+
     <!-- D3.js -->
     <script src="https://d3js.org/d3.v7.min.js"></script>
 </head>
+
 <body>
     <!-- Background Effects -->
     <div class="bg-effects">
@@ -31,7 +35,7 @@
             <div class="logo-icon">🌦️</div>
             <h1>MUMBAI<br><span>WEATHER</span></h1>
         </div>
-        
+
         <div class="nav-section">
             <div class="nav-label">ANALYSIS MODULES</div>
             <a href="#overview" class="nav-item active" data-target="overview">
@@ -105,27 +109,31 @@
                 </h3>
                 <p class="section-description">Comprehensive meteorological analysis of Mumbai's climate patterns</p>
             </div>
-            
+
             <div class="overview-grid">
                 <div class="overview-card">
                     <div class="card-icon">🎯</div>
                     <h4>Mission</h4>
-                    <p>Transform 27 years of raw meteorological data into actionable insights for urban planners, agricultural stakeholders, and public health officials.</p>
+                    <p>Transform 27 years of raw meteorological data into actionable insights for urban planners,
+                        agricultural stakeholders, and public health officials.</p>
                 </div>
                 <div class="overview-card">
                     <div class="card-icon">📍</div>
                     <h4>Location</h4>
-                    <p>Mumbai - India's financial capital, coastal metropolis with 20+ million inhabitants experiencing tropical climate with distinct monsoon seasons.</p>
+                    <p>Mumbai - India's financial capital, coastal metropolis with 20+ million inhabitants experiencing
+                        tropical climate with distinct monsoon seasons.</p>
                 </div>
                 <div class="overview-card">
                     <div class="card-icon">🔬</div>
                     <h4>Parameters</h4>
-                    <p>Temperature (min/max/mean), Precipitation, Humidity, Wind Speed, Atmospheric Pressure, Cloud Cover, and more.</p>
+                    <p>Temperature (min/max/mean), Precipitation, Humidity, Wind Speed, Atmospheric Pressure, Cloud
+                        Cover, and more.</p>
                 </div>
                 <div class="overview-card">
                     <div class="card-icon">👥</div>
                     <h4>Stakeholders</h4>
-                    <p>Urban planners, farmers, tourism operators, emergency services, and general public seeking weather intelligence.</p>
+                    <p>Urban planners, farmers, tourism operators, emergency services, and general public seeking
+                        weather intelligence.</p>
                 </div>
             </div>
 
@@ -157,7 +165,7 @@
                 </h3>
                 <p class="section-description">How have temperature patterns evolved over 27 years?</p>
             </div>
-            
+
             <div class="viz-container">
                 <div class="viz-controls">
                     <button class="control-btn active" data-view="yearly">Yearly Trend</button>
@@ -193,7 +201,7 @@
                 </h3>
                 <p class="section-description">Geographic patterns across Mumbai's zones</p>
             </div>
-            
+
             <div class="viz-container">
                 <div class="viz-controls">
                     <button class="control-btn active" data-metric="temperature">Temperature</button>
@@ -201,7 +209,9 @@
                     <button class="control-btn" data-metric="pressure">Pressure</button>
                 </div>
                 <div class="note-banner">
-                    ℹ️ Dataset has one observation station. Spatial patterns shown as <strong>diurnal (hourly) variation</strong> and <strong>monthly seasonality</strong> — both derived directly from CSV data. Interactive map applies documented IMD coastal gradient offsets.
+                    ℹ️ Dataset has one observation station. Spatial patterns shown as <strong>diurnal (hourly)
+                        variation</strong> and <strong>monthly seasonality</strong> — both derived directly from CSV
+                    data. Interactive map applies documented IMD coastal gradient offsets.
                 </div>
                 <div class="spatial-grid">
                     <div id="spatialHourlyChart" class="chart-area"></div>
@@ -212,7 +222,8 @@
                         <span class="insight-icon">🕐</span>
                         <div>
                             <div class="insight-title">Diurnal Cycle</div>
-                            <div class="insight-text">Temperature peaks ~13:00–15:00, humidity inversely correlated</div>
+                            <div class="insight-text">Temperature peaks ~13:00–15:00, humidity inversely correlated
+                            </div>
                         </div>
                     </div>
                     <div class="insight-card">
@@ -235,12 +246,22 @@
                 </h3>
                 <p class="section-description">80% of annual rainfall occurs during monsoon season (June-September)</p>
             </div>
-            
+
             <div class="viz-container">
                 <div class="monsoon-grid">
                     <div id="rainfallYearly" class="chart-area"></div>
                     <div id="rainfallMonthly" class="chart-area"></div>
-                    <div id="rainfallVariability" class="chart-area full-width"></div>
+                    <div class="chart-area full-width">
+                        <div class="decade-controls" style="margin-bottom:16px;">
+                            <span
+                                style="color:#8b9dc3;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin-right:12px;">Select
+                                Decade:</span>
+                            <button class="control-btn active" data-decade="1990">1990s</button>
+                            <button class="control-btn" data-decade="2000">2000s</button>
+                            <button class="control-btn" data-decade="2010">2010s</button>
+                        </div>
+                        <div id="rainfallVariability"></div>
+                    </div>
                 </div>
                 <div class="chart-insights">
                     <div class="insight-card">
@@ -270,7 +291,7 @@
                 </h3>
                 <p class="section-description">Explore weather conditions by date and time</p>
             </div>
-            
+
             <div class="viz-container">
                 <div class="map-controls">
                     <div class="control-group">
@@ -285,21 +306,27 @@
                 </div>
                 <div id="interactiveMap" class="chart-area large"></div>
                 <div class="map-legend">
-                    <div class="legend-title">Weather Metrics</div>
+                    <div class="legend-title">Zone Colors on Map</div>
                     <div class="legend-items">
                         <div class="legend-item">
                             <span class="legend-color" style="background: #00d9ff"></span>
-                            <span>Temperature</span>
+                            <span>South Mumbai</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-color" style="background: #ffb627"></span>
+                            <span>Western Suburbs</span>
                         </div>
                         <div class="legend-item">
                             <span class="legend-color" style="background: #ff6b9d"></span>
-                            <span>Humidity</span>
+                            <span>Eastern Suburbs</span>
                         </div>
                         <div class="legend-item">
-                            <span class="legend-color" style="background: #ffd700"></span>
-                            <span>Pressure</span>
+                            <span class="legend-color" style="background: #9d4edd"></span>
+                            <span>Navi Mumbai</span>
                         </div>
                     </div>
+                    <div style="margin-top:8px;font-size:12px;color:#8b9dc3;">Click on any marker to view weather
+                        details for that location. Map is bounded to Mumbai metropolitan area.</div>
                 </div>
             </div>
         </section>
@@ -313,7 +340,7 @@
                 </h3>
                 <p class="section-description">Relationships between meteorological parameters</p>
             </div>
-            
+
             <div class="viz-container">
                 <div id="correlationMatrix" class="chart-area large"></div>
                 <div class="chart-insights">
@@ -338,4 +365,5 @@
 
     <script src="script.js"></script>
 </body>
+
 </html>

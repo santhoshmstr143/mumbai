@@ -85,12 +85,12 @@ function estimateRainfall(weatherPhrase) {
 }
 
 function showErrorInAllCharts(message) {
-    ['temperatureChart','spatialHourlyChart','spatialSeasonalChart',
-     'rainfallYearly','rainfallMonthly','rainfallVariability',
-     'interactiveMap','correlationMatrix'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#ff6b9d;font-size:16px;text-align:center;padding:40px;">${message}</div>`;
-    });
+    ['temperatureChart', 'spatialHourlyChart', 'spatialSeasonalChart',
+        'rainfallYearly', 'rainfallMonthly', 'rainfallVariability',
+        'interactiveMap', 'correlationMatrix'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#ff6b9d;font-size:16px;text-align:center;padding:40px;">${message}</div>`;
+        });
 }
 
 // ==================== Header Stats ====================
@@ -142,6 +142,14 @@ function initAllControls() {
                 document.querySelectorAll('#spatial .control-btn').forEach(b => b.classList.remove('active'));
                 this.classList.add('active');
                 createSpatialPatterns();
+            });
+        });
+        // Decade selector for rainfall variability boxplot
+        document.querySelectorAll('#monsoon .decade-controls .control-btn').forEach(btn => {
+            btn.addEventListener('click', function () {
+                document.querySelectorAll('#monsoon .decade-controls .control-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                createRainfallVariability();
             });
         });
     }, 500);
@@ -572,21 +580,23 @@ function createRainfallMonthly() {
         .on('mouseout', function () { d3.select(this).attr('opacity', 0.75); hideTooltip(); });
 }
 
-// FIX 2: Boxplot now renders into a scrollable container
-// The chart is rendered at full width (all years without sampling)
-// and the container div enables horizontal scroll
+// Rainfall boxplot with decade selector — no horizontal scroll
+// Decade buttons are wired up in initAllControls
 function createRainfallVariability() {
     const wrapId = 'rainfallVariability';
     const wrapper = document.getElementById(wrapId);
     if (!wrapper) return;
 
-    // Clear and set up scrollable wrapper
-    wrapper.innerHTML = '';
-    wrapper.style.overflowX = 'auto';
-    wrapper.style.overflowY = 'hidden';
-    wrapper.style.WebkitOverflowScrolling = 'touch';
+    // Determine selected decade from active button
+    const activeDecadeBtn = document.querySelector('#monsoon .decade-controls .control-btn.active');
+    const selectedDecade = activeDecadeBtn ? parseInt(activeDecadeBtn.getAttribute('data-decade')) : null;
 
-    const yearlyStats = Array.from(d3.group(weatherData, d => d.year), ([year, vals]) => {
+    // Clear wrapper
+    wrapper.innerHTML = '';
+    wrapper.style.overflowX = 'hidden';
+    wrapper.style.overflowY = 'hidden';
+
+    const allYearlyStats = Array.from(d3.group(weatherData, d => d.year), ([year, vals]) => {
         const rf = vals.map(d => d.rainfall).sort(d3.ascending);
         return {
             year,
@@ -598,19 +608,28 @@ function createRainfallVariability() {
         };
     }).sort((a, b) => a.year - b.year);
 
+    // Filter to selected decade
+    const yearlyStats = selectedDecade
+        ? allYearlyStats.filter(d => Math.floor(d.year / 10) * 10 === selectedDecade)
+        : allYearlyStats;
+
+    if (!yearlyStats.length) {
+        wrapper.innerHTML = '<div style="color:#8b9dc3;text-align:center;padding:40px;">No data for selected decade</div>';
+        return;
+    }
+
     const margin = { top: 45, right: 30, bottom: 65, left: 70 };
-    const boxW = 28; // fixed width per year box
-    const minWidth = yearlyStats.length * (boxW + 16);
-    const containerWidth = Math.max(wrapper.getBoundingClientRect().width, minWidth);
+    const totalHeight = 550;
+    const containerWidth = wrapper.getBoundingClientRect().width;
     const innerW = containerWidth - margin.left - margin.right;
-    const innerH = 390 - margin.top - margin.bottom;
+    const innerH = totalHeight - margin.top - margin.bottom;
 
     const svgEl = d3.select(wrapper).append('svg')
         .attr('width', containerWidth)
-        .attr('height', 390);
+        .attr('height', totalHeight);
     const svg = svgEl.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
 
-    const xScale = d3.scaleBand().domain(yearlyStats.map(d => d.year)).range([0, innerW]).padding(0.3);
+    const xScale = d3.scaleBand().domain(yearlyStats.map(d => d.year)).range([0, innerW]).padding(0.25);
     const yScale = d3.scaleLinear().domain([0, d3.max(yearlyStats, d => d.max) * 1.1]).range([innerH, 0]);
 
     // Grid
@@ -625,14 +644,11 @@ function createRainfallVariability() {
     svg.append('text').attr('transform', 'rotate(-90)').attr('x', -innerH / 2).attr('y', -55)
         .attr('text-anchor', 'middle').style('fill', '#8b9dc3').style('font-size', '11px').text('Rainfall (mm)');
     svg.append('text').attr('x', innerW / 2).attr('y', innerH + 45)
-        .attr('text-anchor', 'middle').style('fill', '#8b9dc3').style('font-size', '11px').text('Year (scroll horizontally to see all years)');
+        .attr('text-anchor', 'middle').style('fill', '#8b9dc3').style('font-size', '11px')
+        .text(selectedDecade ? `Years in the ${selectedDecade}s` : 'Year');
 
-    addTitle(svg, innerW, '📦 Rainfall Variability Boxplot — All Years (Scroll →)');
-
-    // Scroll hint
-    svg.append('text').attr('x', innerW - 5).attr('y', innerH + 58)
-        .attr('text-anchor', 'end').style('fill', '#ffb627').style('font-size', '10px')
-        .text('← Scroll to explore all years →');
+    const titleDecade = selectedDecade ? ` — ${selectedDecade}s` : ' — All Years';
+    addTitle(svg, innerW, `📦 Rainfall Variability Boxplot${titleDecade}`);
 
     // Draw each box
     yearlyStats.forEach(d => {
@@ -663,7 +679,7 @@ function createRainfallVariability() {
             .attr('width', bw).attr('height', Math.max(1, yScale(d.q1) - yScale(d.q3)))
             .attr('fill', '#00d9ff').attr('opacity', 0.22)
             .attr('stroke', '#00d9ff').attr('stroke-width', 1.5)
-            .attr('rx', 2)
+            .attr('rx', 3)
             .style('cursor', 'pointer')
             .on('mouseover', function (event) {
                 d3.select(this).attr('opacity', 0.45).attr('stroke-width', 2.5);
@@ -698,16 +714,76 @@ function createInteractiveMap() {
     container.innerHTML = '';
 
     const mapDiv = document.createElement('div');
-    mapDiv.style.cssText = 'width:100%;height:520px;border-radius:16px;overflow:hidden;';
+    mapDiv.style.cssText = 'width:100%;height:620px;border-radius:16px;overflow:hidden;';
     container.appendChild(mapDiv);
 
-    if (map) { map.remove(); map = null; }
-    map = L.map(mapDiv, { center: [19.076, 72.8777], zoom: 11 });
+    // Mumbai bounds — restrict panning to the metropolitan area
+    const mumbaiBounds = L.latLngBounds(
+        [18.85, 72.75],   // SW corner
+        [19.30, 73.15]    // NE corner
+    );
 
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-        attribution: 'Satellite imagery © Esri', maxZoom: 18
+    if (map) { map.remove(); map = null; }
+    map = L.map(mapDiv, {
+        center: [19.076, 72.9200],
+        zoom: 12,
+        minZoom: 11,
+        maxZoom: 18,
+        maxBounds: mumbaiBounds.pad(0.1),
+        maxBoundsViscosity: 1.0
+    });
+
+    // Dark-themed Carto tiles — matches the dashboard aesthetic
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '© OpenStreetMap contributors, © CARTO',
+        subdomains: 'abcd',
+        maxZoom: 18
     }).addTo(map);
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', { maxZoom: 18 }).addTo(map);
+
+    // Mumbai boundary polygon overlay for visual focus
+    const mumbaiOutline = L.polygon([
+        [18.893, 72.776], [18.910, 72.810], [18.932, 72.820],
+        [18.960, 72.795], [18.995, 72.803], [19.030, 72.815],
+        [19.065, 72.820], [19.100, 72.823], [19.140, 72.835],
+        [19.180, 72.840], [19.220, 72.848], [19.260, 72.855],
+        [19.275, 72.870], [19.270, 72.905], [19.245, 72.930],
+        [19.200, 72.960], [19.170, 72.965], [19.140, 72.940],
+        [19.115, 72.935], [19.090, 72.920], [19.065, 72.910],
+        [19.040, 72.930], [19.020, 72.960], [19.010, 73.000],
+        [19.015, 73.040], [19.040, 73.070], [19.070, 73.080],
+        [19.050, 73.050], [19.030, 73.030], [19.030, 73.005],
+        [19.060, 72.985], [19.080, 73.010], [19.100, 73.020],
+        [19.050, 73.060], [19.020, 73.080], [18.990, 73.120],
+        [18.960, 73.100], [18.940, 73.060], [18.925, 73.020],
+        [18.910, 72.970], [18.900, 72.920], [18.893, 72.860],
+        [18.890, 72.820]
+    ], {
+        color: '#00d9ff',
+        weight: 2,
+        opacity: 0.6,
+        fillColor: '#00d9ff',
+        fillOpacity: 0.04,
+        dashArray: '8,4'
+    }).addTo(map);
+
+    // Zone legend on the map
+    const legend = L.control({ position: 'bottomright' });
+    legend.onAdd = function () {
+        const div = L.DomUtil.create('div', 'map-zone-legend');
+        div.innerHTML = `
+            <div style="background:rgba(10,14,26,0.9);backdrop-filter:blur(10px);padding:12px 16px;border-radius:10px;border:1px solid rgba(0,217,255,0.3);font-family:Rajdhani,sans-serif;">
+                <div style="font-size:11px;font-weight:700;color:#00d9ff;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Mumbai Zones</div>
+                <div style="display:flex;flex-direction:column;gap:5px;">
+                    <div style="display:flex;align-items:center;gap:8px;"><span style="width:12px;height:12px;border-radius:50%;background:#00d9ff;display:inline-block;box-shadow:0 0 6px #00d9ff;"></span><span style="color:#e8f1ff;font-size:12px;">South Mumbai</span></div>
+                    <div style="display:flex;align-items:center;gap:8px;"><span style="width:12px;height:12px;border-radius:50%;background:#ffb627;display:inline-block;box-shadow:0 0 6px #ffb627;"></span><span style="color:#e8f1ff;font-size:12px;">Western Suburbs</span></div>
+                    <div style="display:flex;align-items:center;gap:8px;"><span style="width:12px;height:12px;border-radius:50%;background:#ff6b9d;display:inline-block;box-shadow:0 0 6px #ff6b9d;"></span><span style="color:#e8f1ff;font-size:12px;">Eastern Suburbs</span></div>
+                    <div style="display:flex;align-items:center;gap:8px;"><span style="width:12px;height:12px;border-radius:50%;background:#9d4edd;display:inline-block;box-shadow:0 0 6px #9d4edd;"></span><span style="color:#e8f1ff;font-size:12px;">Navi Mumbai</span></div>
+                </div>
+            </div>
+        `;
+        return div;
+    };
+    legend.addTo(map);
 
     const mumbaiDistricts = [
         { name: 'Colaba', lat: 18.9067, lon: 72.8147, zone: 'South Mumbai' },
@@ -779,13 +855,17 @@ function createInteractiveMap() {
         mumbaiDistricts.forEach(loc => {
             const wx = getWeatherForLocationAndTime(loc, selectedDate, selectedTime);
             const marker = L.circleMarker([loc.lat, loc.lon], {
-                radius: 9, fillColor: zoneColors[loc.zone],
-                color: '#fff', weight: 2, opacity: 1, fillOpacity: 0.85
+                radius: 10, fillColor: zoneColors[loc.zone],
+                color: '#fff', weight: 2, opacity: 1, fillOpacity: 0.9
             }).addTo(map);
 
+            // Pulse animation on hover
+            marker.on('mouseover', function () { this.setRadius(14); });
+            marker.on('mouseout', function () { this.setRadius(10); });
+
             marker.bindPopup(`
-                <div style="font-family:Rajdhani,sans-serif;min-width:195px;font-size:13px;">
-                    <strong style="color:${zoneColors[loc.zone]};font-size:15px;">${loc.name}</strong><br/>
+                <div style="font-family:Rajdhani,sans-serif;min-width:210px;font-size:13px;">
+                    <strong style="color:${zoneColors[loc.zone]};font-size:16px;">${loc.name}</strong><br/>
                     <span style="color:#888;font-size:11px;">${loc.zone} · ${wx.dataDate ? wx.dataDate.toLocaleString() : ''}</span>
                     <hr style="margin:7px 0;border:none;border-top:1px solid #ddd;">
                     <table style="width:100%;">
