@@ -25,15 +25,8 @@
         <div class="noise-overlay"></div>
     </div>
 
-    <!-- Mobile Menu Toggle -->
-    <button class="mobile-menu-toggle" id="mobileMenuToggle">
-        <span></span>
-        <span></span>
-        <span></span>
-    </button>
-
     <!-- Sidebar Navigation -->
-    <nav class="sidebar" id="sidebar">
+    <nav class="sidebar">
         <div class="logo">
             <div class="logo-icon">🌦️</div>
             <h1>MUMBAI<br><span>WEATHER</span></h1>
@@ -207,23 +200,26 @@
                     <button class="control-btn" data-metric="humidity">Humidity</button>
                     <button class="control-btn" data-metric="pressure">Pressure</button>
                 </div>
+                <div class="note-banner">
+                    ℹ️ Dataset has one observation station. Spatial patterns shown as <strong>diurnal (hourly) variation</strong> and <strong>monthly seasonality</strong> — both derived directly from CSV data. Interactive map applies documented IMD coastal gradient offsets.
+                </div>
                 <div class="spatial-grid">
-                    <div id="spatialMap" class="chart-area large"></div>
-                    <div id="zoneComparison" class="chart-area"></div>
+                    <div id="spatialHourlyChart" class="chart-area"></div>
+                    <div id="spatialSeasonalChart" class="chart-area"></div>
                 </div>
                 <div class="chart-insights">
                     <div class="insight-card">
-                        <span class="insight-icon">🏖️</span>
+                        <span class="insight-icon">🕐</span>
                         <div>
-                            <div class="insight-title">Coastal Effect</div>
-                            <div class="insight-text">South Mumbai shows 2-3°C cooler than inland areas</div>
+                            <div class="insight-title">Diurnal Cycle</div>
+                            <div class="insight-text">Temperature peaks ~13:00–15:00, humidity inversely correlated</div>
                         </div>
                     </div>
                     <div class="insight-card">
-                        <span class="insight-icon">🌆</span>
+                        <span class="insight-icon">🌧️</span>
                         <div>
-                            <div class="insight-title">Urban Zones</div>
-                            <div class="insight-text">Western/Eastern suburbs exhibit higher variability</div>
+                            <div class="insight-title">Monsoon Pattern</div>
+                            <div class="insight-text">June–September dominates humidity and rainfall signals</div>
                         </div>
                     </div>
                 </div>
@@ -259,13 +255,6 @@
                         <div>
                             <div class="insight-title">Variability</div>
                             <div class="insight-text">High year-to-year variation impacts water management</div>
-                        </div>
-                    </div>
-                    <div class="insight-card">
-                        <span class="insight-icon">📦</span>
-                        <div>
-                            <div class="insight-title">Box Plot Guide</div>
-                            <div class="insight-text">Q1 (25%) & Q3 (75%) show middle 50% of data, revealing rainfall distribution</div>
                         </div>
                     </div>
                 </div>
