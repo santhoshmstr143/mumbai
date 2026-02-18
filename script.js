@@ -156,15 +156,19 @@ function initAllControls() {
 }
 
 // ==================== SVG HELPERS ====================
-function makeSVG(containerId, margin, totalHeight) {
+function makeSVG(containerId, margin, totalHeight, scale = 0.75) {
     const container = d3.select(`#${containerId}`);
     container.html('');
-    const w = container.node().getBoundingClientRect().width;
+    const containerW = container.node().getBoundingClientRect().width;
+    const w = Math.floor(containerW * scale);
+    const h = Math.floor(totalHeight * scale);
     const innerW = w - margin.left - margin.right;
-    const innerH = totalHeight - margin.top - margin.bottom;
+    const innerH = h - margin.top - margin.bottom;
     const svg = container.append('svg')
         .attr('width', w)
-        .attr('height', totalHeight)
+        .attr('height', h)
+        .style('display', 'block')
+        .style('margin', '0 auto')
         .append('g')
         .attr('transform', `translate(${margin.left},${margin.top})`);
     return { svg, width: innerW, height: innerH, container };
@@ -362,7 +366,7 @@ function createDiurnalChart(metric = 'temperature') {
     const el = document.getElementById(chartId);
     if (!el) return;
 
-    const { svg, width, height } = makeSVG(chartId, { top: 45, right: 30, bottom: 65, left: 70 }, 390);
+    const { svg, width, height } = makeSVG(chartId, { top: 45, right: 30, bottom: 65, left: 70 }, 520);
 
     const metricProps = {
         temperature: { key: 'temperature', label: 'Temperature (°C)', color: '#00d9ff', unit: '°C' },
@@ -383,7 +387,8 @@ function createDiurnalChart(metric = 'temperature') {
         .range([height, 0]);
 
     addAxes(svg, xScale, yScale, width, height, 'Hour of Day (0 = midnight, 12 = noon)', prop.label, d => `${d}:00`);
-    addTitle(svg, width, `🕐 Diurnal ${prop.label.split(' ')[0]} Variation — Avg per Hour of Day`);
+    const metricName = metric.charAt(0).toUpperCase() + metric.slice(1);
+    addTitle(svg, width, `🕐 ${metricName} Pattern — Diurnal Variation (Avg per Hour of Day)`);
 
     // Shade daytime 6–18
     svg.append('rect').attr('x', xScale(6)).attr('y', 0)
@@ -439,7 +444,7 @@ function createSeasonalHeatmap(metric = 'temperature') {
     };
     const prop = metricProps[metric];
 
-    const { svg, width, height } = makeSVG(chartId, { top: 50, right: 20, bottom: 65, left: 75 }, 390);
+    const { svg, width, height } = makeSVG(chartId, { top: 50, right: 20, bottom: 65, left: 75 }, 520);
 
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -459,7 +464,8 @@ function createSeasonalHeatmap(metric = 'temperature') {
     svg.append('g').attr('class', 'axis').call(d3.axisLeft(yScale));
     svg.append('text').attr('transform', 'rotate(-90)').attr('x', -height / 2).attr('y', -58)
         .attr('text-anchor', 'middle').style('fill', '#8b9dc3').style('font-size', '11px').text(prop.label);
-    addTitle(svg, width, `📅 Monthly ${prop.label.split(' ')[0]} Pattern — Average Across All Years`);
+    const metricName = metric.charAt(0).toUpperCase() + metric.slice(1);
+    addTitle(svg, width, `📅 ${metricName} Pattern — Monthly Average Across All Years`);
 
     // Monsoon bracket
     if (metric !== 'pressure') {
@@ -504,7 +510,7 @@ function createMonsoonAnalysis() {
 // FIX 1: Removed red extreme-year dots — all dots now uniform colour
 // The area chart itself already shows peaks/troughs visually
 function createRainfallYearly() {
-    const { svg, width, height } = makeSVG('rainfallYearly', { top: 45, right: 30, bottom: 65, left: 70 }, 390);
+    const { svg, width, height } = makeSVG('rainfallYearly', { top: 45, right: 30, bottom: 65, left: 70 }, 520, 0.85);
 
     const data = Array.from(
         d3.rollup(weatherData, v => d3.sum(v, d => d.rainfall), d => d.year),
@@ -543,7 +549,7 @@ function createRainfallYearly() {
 }
 
 function createRainfallMonthly() {
-    const { svg, width, height } = makeSVG('rainfallMonthly', { top: 45, right: 20, bottom: 65, left: 70 }, 390);
+    const { svg, width, height } = makeSVG('rainfallMonthly', { top: 45, right: 20, bottom: 65, left: 70 }, 520, 0.85);
 
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
