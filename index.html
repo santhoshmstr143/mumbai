@@ -25,8 +25,15 @@
         <div class="noise-overlay"></div>
     </div>
 
+    <!-- Mobile Menu Toggle -->
+    <button class="mobile-menu-toggle" id="mobileMenuToggle">
+        <span></span>
+        <span></span>
+        <span></span>
+    </button>
+
     <!-- Sidebar Navigation -->
-    <nav class="sidebar">
+    <nav class="sidebar" id="sidebar">
         <div class="logo">
             <div class="logo-icon">🌦️</div>
             <h1>MUMBAI<br><span>WEATHER</span></h1>
@@ -67,7 +74,7 @@
             </div>
             <div class="data-info">
                 <div class="info-label">OBSERVATIONS</div>
-                <div class="info-value">9,800+</div>
+                <div class="info-value" id="recordCount">0</div>
             </div>
         </div>
     </nav>
@@ -252,6 +259,13 @@
                         <div>
                             <div class="insight-title">Variability</div>
                             <div class="insight-text">High year-to-year variation impacts water management</div>
+                        </div>
+                    </div>
+                    <div class="insight-card">
+                        <span class="insight-icon">📦</span>
+                        <div>
+                            <div class="insight-title">Box Plot Guide</div>
+                            <div class="insight-text">Q1 (25%) & Q3 (75%) show middle 50% of data, revealing rainfall distribution</div>
                         </div>
                     </div>
                 </div>

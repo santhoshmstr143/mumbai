@@ -7,12 +7,47 @@ let markers = []; // Store map markers globally
 // ==================== Navigation ====================
 document.addEventListener('DOMContentLoaded', async () => {
     initNavigation();
+    initMobileMenu();
     await loadCSVData();
     if (weatherData.length > 0) {
         initVisualizations();
         updateHeaderStats();
     }
 });
+
+function initMobileMenu() {
+    const menuToggle = document.getElementById('mobileMenuToggle');
+    const sidebar = document.getElementById('sidebar');
+    const navItems = document.querySelectorAll('.nav-item');
+    
+    if (menuToggle && sidebar) {
+        menuToggle.addEventListener('click', () => {
+            menuToggle.classList.toggle('active');
+            sidebar.classList.toggle('active');
+        });
+        
+        // Close menu when clicking a nav item
+        navItems.forEach(item => {
+            item.addEventListener('click', () => {
+                if (window.innerWidth <= 768) {
+                    menuToggle.classList.remove('active');
+                    sidebar.classList.remove('active');
+                }
+            });
+        });
+        
+        // Close menu when clicking outside
+        document.addEventListener('click', (e) => {
+            if (window.innerWidth <= 768 && 
+                !sidebar.contains(e.target) && 
+                !menuToggle.contains(e.target) && 
+                sidebar.classList.contains('active')) {
+                menuToggle.classList.remove('active');
+                sidebar.classList.remove('active');
+            }
+        });
+    }
+}
 
 function initNavigation() {
     const navItems = document.querySelectorAll('.nav-item');
@@ -89,6 +124,7 @@ async function loadCSVData() {
         
     } catch (error) {
         console.error('❌ ERROR loading CSV:', error);
+        
         alert('⚠️ CRITICAL ERROR: Could not load cleaned_data.csv\n\n' +
               'Please check:\n' +
               '1. File "cleaned_data.csv" is in the SAME folder as index.html\n' +
@@ -139,7 +175,18 @@ function updateHeaderStats() {
         document.getElementById('avgHumidity').textContent = avgHumidity ? `${avgHumidity.toFixed(0)}%` : '--';
         document.getElementById('maxTemp').textContent = maxTemp ? `${maxTemp.toFixed(1)}°C` : '--';
         
-        console.log('📊 Stats:', {avgTemp: avgTemp.toFixed(1), avgHumidity: avgHumidity.toFixed(0), maxTemp: maxTemp.toFixed(1)});
+        // Update record count
+        const recordCount = document.getElementById('recordCount');
+        if (recordCount) {
+            recordCount.textContent = weatherData.length.toLocaleString();
+        }
+        
+        console.log('📊 Stats:', {
+            avgTemp: avgTemp.toFixed(1), 
+            avgHumidity: avgHumidity.toFixed(0), 
+            maxTemp: maxTemp.toFixed(1),
+            records: weatherData.length
+        });
     } catch (error) {
         console.error('Error updating stats:', error);
     }
@@ -1044,28 +1091,20 @@ function createRainfallVariability() {
     const container = d3.select('#rainfallVariability');
     container.html('');
     
-    // Add explanation
+    // Add clear explanation
     container.append('div')
         .style('text-align', 'center')
-        .style('padding', '8px')
+        .style('padding', '10px')
         .style('background', 'rgba(255, 107, 157, 0.1)')
         .style('border-radius', '6px')
-        .style('margin-bottom', '10px')
+        .style('margin-bottom', '12px')
         .style('font-size', '12px')
         .style('color', '#ff6b9d')
-        .html('<strong>📦 VARIABILITY</strong><br/>Box plots showing rainfall variation across years (min, Q1, median, Q3, max)');
+        .html('<strong>📦 RAINFALL VARIABILITY BY YEAR</strong><br/>Hover over boxes to see min, Q1, median, Q3, max values');
     
-    const margin = {top: 30, right: 20, bottom: 50, left: 60};
-    const width = container.node().getBoundingClientRect().width - margin.left - margin.right;
-    const height = 220 - margin.top - margin.bottom;
+    const margin = {top: 40, right: 20, bottom: 60, left: 60};
     
-    const svg = container.append('svg')
-        .attr('width', width + margin.left + margin.right)
-        .attr('height', height + margin.top + margin.bottom)
-        .append('g')
-        .attr('transform', `translate(${margin.left},${margin.top})`);
-    
-    // Calculate box plot stats
+    // Calculate box plot stats first to know how many years we have
     const yearlyStats = Array.from(d3.group(weatherData, d => d.year), ([year, values]) => {
         const rainfalls = values.map(d => d.rainfall).sort(d3.ascending);
         return {
@@ -1074,9 +1113,40 @@ function createRainfallVariability() {
             median: d3.quantile(rainfalls, 0.5),
             q3: d3.quantile(rainfalls, 0.75),
             min: rainfalls[0],
-            max: rainfalls[rainfalls.length - 1]
+            max: rainfalls[rainfalls.length - 1],
+            count: rainfalls.length
         };
-    }).filter((d, i) => i % 3 === 0); // Sample every 3 years
+    })
+    .sort((a, b) => a.year - b.year); // Sort by year chronologically - show ALL years
+    
+    // Make width dynamic based on number of years (minimum 50px per year)
+    const containerWidth = container.node().getBoundingClientRect().width;
+    const minWidthPerYear = 50;
+    const calculatedWidth = Math.max(containerWidth - margin.left - margin.right, yearlyStats.length * minWidthPerYear);
+    const width = calculatedWidth;
+    const height = 250 - margin.top - margin.bottom;
+    
+    // Create scrollable wrapper
+    const scrollWrapper = container.append('div')
+        .style('overflow-x', 'auto')
+        .style('overflow-y', 'hidden')
+        .style('width', '100%');
+    
+    const svg = scrollWrapper.append('svg')
+        .attr('width', width + margin.left + margin.right)
+        .attr('height', height + margin.top + margin.bottom)
+        .append('g')
+        .attr('transform', `translate(${margin.left},${margin.top})`);
+    
+    if (yearlyStats.length === 0) {
+        svg.append('text')
+            .attr('x', width / 2)
+            .attr('y', height / 2)
+            .attr('text-anchor', 'middle')
+            .style('fill', '#ff6b9d')
+            .text('No variability data available');
+        return;
+    }
     
     const xScale = d3.scaleBand()
         .domain(yearlyStats.map(d => d.year))
@@ -1087,15 +1157,47 @@ function createRainfallVariability() {
         .domain([0, d3.max(yearlyStats, d => d.max) * 1.1])
         .range([height, 0]);
     
+    // Grid lines
+    svg.append('g')
+        .attr('class', 'grid')
+        .attr('opacity', 0.1)
+        .call(d3.axisLeft(yScale).tickSize(-width).tickFormat(''));
+    
     // Axes
     svg.append('g')
         .attr('class', 'axis')
         .attr('transform', `translate(0,${height})`)
-        .call(d3.axisBottom(xScale));
+        .call(d3.axisBottom(xScale).tickFormat(d => d))
+        .selectAll('text')
+        .style('text-anchor', 'end')
+        .attr('dx', '-0.5em')
+        .attr('dy', '0.5em')
+        .attr('transform', 'rotate(-45)');
     
     svg.append('g')
         .attr('class', 'axis')
-        .call(d3.axisLeft(yScale));
+        .call(d3.axisLeft(yScale).ticks(6));
+    
+    // Y-axis label
+    svg.append('text')
+        .attr('transform', 'rotate(-90)')
+        .attr('x', -height / 2)
+        .attr('y', -45)
+        .attr('text-anchor', 'middle')
+        .style('fill', '#8b9dc3')
+        .style('font-size', '12px')
+        .text('Rainfall (mm)');
+    
+    // Title
+    svg.append('text')
+        .attr('x', width / 2)
+        .attr('y', -20)
+        .attr('text-anchor', 'middle')
+        .style('fill', '#e8f1ff')
+        .style('font-size', '14px')
+        .style('font-weight', '600')
+        .style('font-family', 'Orbitron, monospace')
+        .text('Rainfall Distribution by Year');
     
     // Box plots
     const boxWidth = xScale.bandwidth();
@@ -1104,35 +1206,182 @@ function createRainfallVariability() {
         const x = xScale(d.year);
         const center = x + boxWidth / 2;
         
-        // Min-Max line
-        svg.append('line')
+        // Create group for interactivity
+        const boxGroup = svg.append('g')
+            .attr('class', 'box-group')
+            .style('cursor', 'pointer');
+        
+        // Min-Max line (whiskers)
+        boxGroup.append('line')
             .attr('x1', center)
             .attr('x2', center)
             .attr('y1', yScale(d.min))
             .attr('y2', yScale(d.max))
-            .attr('stroke', '#8b9dc3')
-            .attr('stroke-width', 2);
-        
-        // Box
-        svg.append('rect')
-            .attr('x', x)
-            .attr('y', yScale(d.q3))
-            .attr('width', boxWidth)
-            .attr('height', yScale(d.q1) - yScale(d.q3))
-            .attr('fill', '#00d9ff')
-            .attr('opacity', 0.3)
             .attr('stroke', '#00d9ff')
-            .attr('stroke-width', 2);
+            .attr('stroke-width', 2)
+            .attr('opacity', 0.6);
+        
+        // Min cap
+        boxGroup.append('line')
+            .attr('x1', center - boxWidth / 4)
+            .attr('x2', center + boxWidth / 4)
+            .attr('y1', yScale(d.min))
+            .attr('y2', yScale(d.min))
+            .attr('stroke', '#00d9ff')
+            .attr('stroke-width', 2)
+            .attr('opacity', 0.6);
+        
+        // Max cap
+        boxGroup.append('line')
+            .attr('x1', center - boxWidth / 4)
+            .attr('x2', center + boxWidth / 4)
+            .attr('y1', yScale(d.max))
+            .attr('y2', yScale(d.max))
+            .attr('stroke', '#00d9ff')
+            .attr('stroke-width', 2)
+            .attr('opacity', 0.6);
+        
+        // Box (Q1 to Q3)
+        boxGroup.append('rect')
+            .attr('x', x + boxWidth * 0.1)
+            .attr('y', yScale(d.q3))
+            .attr('width', boxWidth * 0.8)
+            .attr('height', Math.max(yScale(d.q1) - yScale(d.q3), 1))
+            .attr('fill', '#00d9ff')
+            .attr('opacity', 0.4)
+            .attr('stroke', '#00d9ff')
+            .attr('stroke-width', 2)
+            .attr('rx', 4);
         
         // Median line
-        svg.append('line')
-            .attr('x1', x)
-            .attr('x2', x + boxWidth)
+        boxGroup.append('line')
+            .attr('x1', x + boxWidth * 0.1)
+            .attr('x2', x + boxWidth * 0.9)
             .attr('y1', yScale(d.median))
             .attr('y2', yScale(d.median))
             .attr('stroke', '#ff6b9d')
             .attr('stroke-width', 3);
+        
+        // Add invisible larger rect for better hover detection
+        boxGroup.append('rect')
+            .attr('x', x)
+            .attr('y', yScale(d.max))
+            .attr('width', boxWidth)
+            .attr('height', yScale(d.min) - yScale(d.max))
+            .attr('fill', 'transparent');
+        
+        // Hover effects
+        boxGroup.on('mouseover', function(event) {
+            // Highlight box
+            d3.select(this).select('rect:nth-child(5)')
+                .transition().duration(200)
+                .attr('opacity', 0.7)
+                .attr('stroke-width', 3);
+            
+            d3.select(this).selectAll('line')
+                .transition().duration(200)
+                .attr('opacity', 1)
+                .attr('stroke-width', 3);
+            
+            // Show detailed tooltip
+            showTooltip(event, `
+                <div style="text-align: left;">
+                    <strong style="color: #ff6b9d; font-size: 14px;">Year ${d.year}</strong><br/>
+                    <hr style="margin: 6px 0; border: none; border-top: 1px solid #444;">
+                    <table style="width: 100%; font-size: 12px;">
+                        <tr>
+                            <td style="padding: 2px 0; color: #00d9ff;">📊 Max:</td>
+                            <td style="text-align: right; font-weight: 700;">${d.max.toFixed(1)} mm</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 2px 0; color: #00d9ff;">▲ Q3 (75%):</td>
+                            <td style="text-align: right; font-weight: 700;">${d.q3.toFixed(1)} mm</td>
+                        </tr>
+                        <tr style="background: rgba(255, 107, 157, 0.2);">
+                            <td style="padding: 2px 0; color: #ff6b9d;">━ Median:</td>
+                            <td style="text-align: right; font-weight: 700; color: #ff6b9d;">${d.median.toFixed(1)} mm</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 2px 0; color: #00d9ff;">▼ Q1 (25%):</td>
+                            <td style="text-align: right; font-weight: 700;">${d.q1.toFixed(1)} mm</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 2px 0; color: #00d9ff;">📉 Min:</td>
+                            <td style="text-align: right; font-weight: 700;">${d.min.toFixed(1)} mm</td>
+                        </tr>
+                        <tr>
+                            <td colspan="2" style="padding-top: 6px; font-size: 11px; color: #888;">
+                                Data points: ${d.count}
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            `);
+        })
+        .on('mouseout', function() {
+            // Reset box
+            d3.select(this).select('rect:nth-child(5)')
+                .transition().duration(200)
+                .attr('opacity', 0.4)
+                .attr('stroke-width', 2);
+            
+            d3.select(this).selectAll('line')
+                .transition().duration(200)
+                .attr('opacity', 0.6)
+                .attr('stroke-width', 2);
+            
+            hideTooltip();
+        });
     });
+    
+    // Add legend explaining box plot elements
+    const legendY = -5;
+    const legend = svg.append('g')
+        .attr('transform', `translate(${width - 200}, ${legendY})`);
+    
+    // Legend background
+    legend.append('rect')
+        .attr('x', -8)
+        .attr('y', -15)
+        .attr('width', 210)
+        .attr('height', 65)
+        .attr('fill', 'rgba(26, 33, 48, 0.8)')
+        .attr('stroke', 'rgba(0, 217, 255, 0.3)')
+        .attr('stroke-width', 1)
+        .attr('rx', 6);
+    
+    legend.append('text')
+        .attr('x', 0)
+        .attr('y', -5)
+        .style('fill', '#00d9ff')
+        .style('font-size', '10px')
+        .style('font-weight', '700')
+        .text('BOX PLOT LEGEND');
+    
+    const legendItems = [
+        {label: 'Max/Min', color: '#00d9ff', y: 8},
+        {label: 'Q3/Q1 (Box)', color: '#00d9ff', y: 20},
+        {label: 'Median (Line)', color: '#ff6b9d', y: 32}
+    ];
+    
+    legendItems.forEach(item => {
+        legend.append('line')
+            .attr('x1', 0)
+            .attr('x2', 20)
+            .attr('y1', item.y)
+            .attr('y2', item.y)
+            .attr('stroke', item.color)
+            .attr('stroke-width', 2);
+        
+        legend.append('text')
+            .attr('x', 25)
+            .attr('y', item.y + 4)
+            .style('fill', '#8b9dc3')
+            .style('font-size', '10px')
+            .text(item.label);
+    });
+    
+    console.log('✅ Rainfall variability created with hover tooltips');
 }
 
 // ==================== INTERACTIVE MAP (SATELLITE) ====================
