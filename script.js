@@ -739,12 +739,27 @@ function createInteractiveMap() {
         maxBoundsViscosity: 1.0
     });
 
-    // Dark-themed Carto tiles — matches the dashboard aesthetic
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    // Base layers for toggle
+    const darkLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
         attribution: '© OpenStreetMap contributors, © CARTO',
         subdomains: 'abcd',
         maxZoom: 18
-    }).addTo(map);
+    });
+
+    const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        attribution: '© Esri, Maxar, Earthstar Geographics',
+        maxZoom: 18
+    });
+
+    // Add dark layer as default
+    darkLayer.addTo(map);
+
+    // Layer control toggle
+    const baseLayers = {
+        '🌑 Dark': darkLayer,
+        '🛰️ Satellite': satelliteLayer
+    };
+    L.control.layers(baseLayers, null, { position: 'topright', collapsed: false }).addTo(map);
 
     // Mumbai boundary polygon overlay for visual focus
     const mumbaiOutline = L.polygon([

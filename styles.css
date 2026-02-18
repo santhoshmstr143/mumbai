@@ -846,3 +846,35 @@ body {
     line-height: 1.5;
 }
 .note-banner strong { color: var(--color-accent-cyan); }
+
+/* ==================== Leaflet Layer Control ==================== */
+.leaflet-control-layers {
+    background: rgba(10, 14, 26, 0.9) !important;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(0, 217, 255, 0.3) !important;
+    border-radius: 10px !important;
+    color: var(--color-text-primary) !important;
+    font-family: var(--font-body) !important;
+    padding: 10px 14px !important;
+    box-shadow: var(--shadow-glow) !important;
+}
+
+.leaflet-control-layers-base label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    transition: color 0.2s ease;
+}
+
+.leaflet-control-layers-base label:hover {
+    color: var(--color-accent-cyan);
+}
+
+.leaflet-control-layers-base input[type="radio"] {
+    accent-color: var(--color-accent-cyan);
+}
