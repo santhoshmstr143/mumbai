@@ -21,8 +21,8 @@
     --shadow-intense: 0 0 60px rgba(157, 78, 221, 0.4);
     
     /* Typography */
-    --font-display: 'Orbitron', monospace;
-    --font-body: 'Rajdhani', sans-serif;
+    --font-display: 'Inter', sans-serif;
+    --font-body: 'Inter', sans-serif;
     
     /* Spacing */
     --sidebar-width: 280px;

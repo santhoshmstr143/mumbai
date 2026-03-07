@@ -3,6 +3,7 @@ let weatherData = [];
 let currentSection = 'overview';
 let map = null;
 let markers = [];
+let spatialFilterMonth = null; // null = all months; 1-12 = filter to that month
 
 // ==================== Navigation ====================
 document.addEventListener('DOMContentLoaded', async () => {
@@ -141,6 +142,7 @@ function initAllControls() {
             btn.addEventListener('click', function () {
                 document.querySelectorAll('#spatial .control-btn').forEach(b => b.classList.remove('active'));
                 this.classList.add('active');
+                spatialFilterMonth = null; // reset cross-filter when switching metric
                 createSpatialPatterns();
             });
         });
@@ -189,7 +191,7 @@ function addAxes(svg, xScale, yScale, width, height, xLabel, yLabel, xTickFormat
 function addTitle(svg, width, text) {
     svg.append('text').attr('x', width / 2).attr('y', -18).attr('text-anchor', 'middle')
         .style('fill', '#e8f1ff').style('font-size', '14px').style('font-weight', '700')
-        .style('font-family', 'Orbitron, monospace').text(text);
+        .style('font-family', 'Inter, sans-serif').text(text);
 }
 
 // ==================== TEMPERATURE TRENDS ====================
@@ -237,15 +239,33 @@ function createYearlyTrend() {
                 .style('filter', `drop-shadow(0 0 5px ${color}50)`);
         });
 
-    svg.selectAll('.dot').data(data).enter().append('circle')
+    // Visible dots (mean line)
+    svg.selectAll('.dot-vis').data(data).enter().append('circle')
+        .attr('class', 'dot-vis')
         .attr('cx', d => xScale(d.year)).attr('cy', d => yScale(d.mean))
         .attr('r', 4).attr('fill', '#00d9ff').attr('stroke', '#0a0e1a').attr('stroke-width', 2)
-        .style('cursor', 'pointer')
+        .style('pointer-events', 'none');
+
+    // Large invisible hit-area dots for reliable hover
+    svg.selectAll('.dot-hit').data(data).enter().append('circle')
+        .attr('class', 'dot-hit')
+        .attr('cx', d => xScale(d.year)).attr('cy', d => yScale(d.mean))
+        .attr('r', 12).attr('fill', 'transparent').style('cursor', 'pointer')
         .on('mouseover', function (event, d) {
-            d3.select(this).transition().duration(150).attr('r', 7);
-            showTooltip(event, `<strong>Year ${d.year}</strong><br/>Mean: ${d.mean.toFixed(1)}°C<br/>Max: ${d.max.toFixed(1)}°C<br/>Min: ${d.min.toFixed(1)}°C`);
+            svg.selectAll('.dot-vis').filter(v => v.year === d.year)
+                .transition().duration(150).attr('r', 7);
+            showTooltip(event,
+                `<strong>📅 Year ${d.year}</strong><br/>` +
+                `🌡️ Mean: <b>${d.mean.toFixed(1)}°C</b><br/>` +
+                `🔺 Max: ${d.max.toFixed(1)}°C<br/>` +
+                `🔻 Min: ${d.min.toFixed(1)}°C`);
         })
-        .on('mouseout', function () { d3.select(this).transition().duration(150).attr('r', 4); hideTooltip(); });
+        .on('mousemove', function (event) { moveTooltip(event); })
+        .on('mouseout', function (event, d) {
+            svg.selectAll('.dot-vis').filter(v => v.year === d.year)
+                .transition().duration(150).attr('r', 4);
+            hideTooltip();
+        });
 
     const legend = svg.append('g').attr('transform', `translate(${width + 12}, 10)`);
     [{ label: 'Max', color: '#ff6b9d' }, { label: 'Mean', color: '#00d9ff' }, { label: 'Min', color: '#9d4edd' }]
@@ -287,9 +307,39 @@ function createSeasonalTrend() {
 
     const line = d3.line().x(d => xScale(d.year)).y(d => yScale(d.temp)).curve(d3.curveMonotoneX);
     d3.group(seasonalData, d => d.season).forEach((vals, season) => {
-        svg.append('path').datum(vals.sort((a, b) => a.year - b.year)).attr('fill', 'none')
+        const sorted = vals.sort((a, b) => a.year - b.year);
+        svg.append('path').datum(sorted).attr('fill', 'none')
             .attr('stroke', seasonColors[season]).attr('stroke-width', 2.5).attr('d', line)
             .style('filter', `drop-shadow(0 0 5px ${seasonColors[season]}70)`);
+
+        // Visible dots
+        svg.selectAll(null).data(sorted).enter().append('circle')
+            .attr('cx', d => xScale(d.year)).attr('cy', d => yScale(d.temp))
+            .attr('r', 3.5)
+            .attr('fill', seasonColors[season])
+            .attr('stroke', '#0a0e1a').attr('stroke-width', 1.5)
+            .style('pointer-events', 'none')
+            .attr('class', `sdot-vis sdot-${season.replace(/[^a-z]/gi, '')}`);
+
+        // Large invisible hit area
+        svg.selectAll(null).data(sorted).enter().append('circle')
+            .attr('cx', d => xScale(d.year)).attr('cy', d => yScale(d.temp))
+            .attr('r', 12).attr('fill', 'transparent').style('cursor', 'pointer')
+            .on('mouseover', function (event, d) {
+                const cls = `.sdot-${season.replace(/[^a-z]/gi, '')}`;
+                svg.selectAll(cls).filter(v => v.year === d.year)
+                    .transition().duration(150).attr('r', 7);
+                showTooltip(event,
+                    `<strong>📅 Year ${d.year} · ${d.season}</strong><br/>` +
+                    `🌡️ Avg Temp: <b>${d.temp.toFixed(1)}°C</b>`);
+            })
+            .on('mousemove', function (event) { moveTooltip(event); })
+            .on('mouseout', function (event, d) {
+                const cls = `.sdot-${season.replace(/[^a-z]/gi, '')}`;
+                svg.selectAll(cls).filter(v => v.year === d.year)
+                    .transition().duration(150).attr('r', 3.5);
+                hideTooltip();
+            });
     });
 
     const legend = svg.append('g').attr('transform', `translate(${width + 12}, 10)`);
@@ -374,9 +424,15 @@ function createDiurnalChart(metric = 'temperature') {
         pressure: { key: 'pressure', label: 'Pressure (hPa)', color: '#ffb627', unit: ' hPa' }
     };
     const prop = metricProps[metric];
+    const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+    // === CROSS-FILTER: use only the selected month's data, or all data ===
+    const sourceData = spatialFilterMonth
+        ? weatherData.filter(d => d.month === spatialFilterMonth)
+        : weatherData;
 
     const hourlyData = Array.from(
-        d3.rollup(weatherData, v => d3.mean(v, d => d[prop.key]), d => d.hour),
+        d3.rollup(sourceData, v => d3.mean(v, d => d[prop.key]), d => d.hour),
         ([hour, val]) => ({ hour, val })
     ).sort((a, b) => a.hour - b.hour);
 
@@ -388,7 +444,10 @@ function createDiurnalChart(metric = 'temperature') {
 
     addAxes(svg, xScale, yScale, width, height, 'Hour of Day (0 = midnight, 12 = noon)', prop.label, d => `${d}:00`);
     const metricName = metric.charAt(0).toUpperCase() + metric.slice(1);
-    addTitle(svg, width, `🕐 ${metricName} Pattern — Diurnal Variation (Avg per Hour of Day)`);
+    const filterLabel = spatialFilterMonth
+        ? `${monthNames[spatialFilterMonth - 1]} only`
+        : 'All Months';
+    addTitle(svg, width, `🕐 ${metricName} — Diurnal Pattern (${filterLabel})`);
 
     // Shade daytime 6–18
     svg.append('rect').attr('x', xScale(6)).attr('y', 0)
@@ -404,15 +463,58 @@ function createDiurnalChart(metric = 'temperature') {
     svg.append('path').datum(hourlyData).attr('fill', 'none').attr('stroke', prop.color)
         .attr('stroke-width', 2.5).attr('d', line).style('filter', `drop-shadow(0 0 6px ${prop.color}80)`);
 
-    svg.selectAll('.dot').data(hourlyData).enter().append('circle')
+    // Visible dots
+    svg.selectAll('.dot-vis').data(hourlyData).enter().append('circle')
+        .attr('class', 'dot-vis')
         .attr('cx', d => xScale(d.hour)).attr('cy', d => yScale(d.val))
         .attr('r', 4).attr('fill', prop.color).attr('stroke', '#0a0e1a').attr('stroke-width', 2)
-        .style('cursor', 'pointer')
+        .style('pointer-events', 'none');
+
+    // Large invisible hit-area
+    svg.selectAll('.dot-hit').data(hourlyData).enter().append('circle')
+        .attr('class', 'dot-hit')
+        .attr('cx', d => xScale(d.hour)).attr('cy', d => yScale(d.val))
+        .attr('r', 12).attr('fill', 'transparent').style('cursor', 'pointer')
         .on('mouseover', function (event, d) {
-            d3.select(this).attr('r', 7);
-            showTooltip(event, `<strong>${d.hour}:00 hrs</strong><br/>Avg ${prop.label.split(' ')[0]}: ${d.val.toFixed(2)}${prop.unit}<br/><em style="color:#8b9dc3;font-size:10px;">Average across all years & months</em>`);
+            svg.selectAll('.dot-vis').filter(v => v.hour === d.hour)
+                .transition().duration(150).attr('r', 7);
+            const ctx = spatialFilterMonth ? `${monthNames[spatialFilterMonth - 1]} avg` : 'all-year avg';
+            showTooltip(event,
+                `<strong>🕐 ${d.hour}:00 hrs</strong><br/>` +
+                `Avg ${prop.label.split(' ')[0]}: <b>${d.val.toFixed(2)}${prop.unit}</b><br/>` +
+                `<em style="color:#8b9dc3;font-size:10px;">${ctx} across all years</em>`);
         })
-        .on('mouseout', function () { d3.select(this).attr('r', 4); hideTooltip(); });
+        .on('mousemove', function (event) { moveTooltip(event); })
+        .on('mouseout', function (event, d) {
+            svg.selectAll('.dot-vis').filter(v => v.hour === d.hour)
+                .transition().duration(150).attr('r', 4);
+            hideTooltip();
+        });
+
+    // === HTML filter badge — injected AFTER SVG so it sits below, no SVG overlap ===
+    d3.select('#spatialHourlyChart').selectAll('.diurnal-filter-badge').remove();
+    if (spatialFilterMonth) {
+        d3.select('#spatialHourlyChart').append('div')
+            .attr('class', 'diurnal-filter-badge')
+            .style('display', 'flex')
+            .style('align-items', 'center')
+            .style('justify-content', 'center')
+            .style('gap', '10px')
+            .style('margin-top', '8px')
+            .html(
+                `<span style="background:rgba(0,217,255,0.12);border:1px dashed #00d9ff;border-radius:20px;` +
+                `padding:5px 16px;font-family:Inter,sans-serif;font-size:12px;font-weight:700;` +
+                `color:#00d9ff;letter-spacing:0.5px;">` +
+                `🔍 Filtered to: <strong>${monthNames[spatialFilterMonth - 1]}</strong>` +
+                `</span>` +
+                `<button onclick="spatialFilterMonth=null;` +
+                `(function(){var m=(document.querySelector('#spatial .control-btn.active')||{getAttribute:()=>'temperature'}).getAttribute('data-metric');` +
+                `createSeasonalHeatmap(m);createDiurnalChart(m);})()" ` +
+                `style="background:rgba(255,107,157,0.15);border:1px solid #ff6b9d;border-radius:20px;` +
+                `padding:5px 14px;font-family:Inter,sans-serif;font-size:12px;font-weight:700;` +
+                `color:#ff6b9d;cursor:pointer;letter-spacing:0.5px;">✕ Clear filter</button>`
+            );
+    }
 }
 
 // ---------------------------------------------------------------
@@ -444,7 +546,7 @@ function createSeasonalHeatmap(metric = 'temperature') {
     };
     const prop = metricProps[metric];
 
-    const { svg, width, height } = makeSVG(chartId, { top: 50, right: 20, bottom: 65, left: 75 }, 520);
+    const { svg, width, height } = makeSVG(chartId, { top: 50, right: 20, bottom: 95, left: 75 }, 520);
 
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -479,24 +581,91 @@ function createSeasonalHeatmap(metric = 'temperature') {
             .attr('text-anchor', 'middle').style('fill', '#00d9ff').style('font-size', '9px').text('◄ MONSOON ►');
     }
 
+    // Draw bars (dim unselected when a filter is active)
     svg.selectAll('.mbar').data(monthlyAvg).enter().append('rect')
+        .attr('class', 'mbar')
         .attr('x', d => xScale(monthNames[d.month - 1]))
         .attr('y', d => yScale(d.val))
         .attr('width', xScale.bandwidth())
         .attr('height', d => height - yScale(d.val))
         .attr('fill', d => colorScale(d.val)).attr('rx', 4)
         .style('filter', 'drop-shadow(0 4px 6px rgba(0,0,0,0.4))')
+        .attr('opacity', d => (!spatialFilterMonth || spatialFilterMonth === d.month) ? 1 : 0.25)
+        .attr('stroke', d => spatialFilterMonth === d.month ? '#fff' : 'none')
+        .attr('stroke-width', 2.5)
+        .style('cursor', 'pointer')
+        // Highlight selected bar with a glowing ring
+        .style('box-shadow', d => spatialFilterMonth === d.month ? '0 0 12px #fff' : 'none')
         .on('mouseover', function (event, d) {
-            d3.select(this).attr('opacity', 0.75);
-            showTooltip(event, `<strong>${monthNames[d.month - 1]}</strong><br/>Avg ${prop.label.split('(')[0].trim()}: ${d.val.toFixed(2)}<br/><em style="color:#8b9dc3;font-size:10px;">Pooled avg from all years 1991–2017</em>`);
+            if (spatialFilterMonth !== d.month) d3.select(this).attr('opacity', 0.75);
+            const isMonsoon = d.month >= 6 && d.month <= 9;
+            const isActive = spatialFilterMonth === d.month;
+            showTooltip(event,
+                `<strong>📅 ${monthNames[d.month - 1]}</strong>${isMonsoon ? ' <span style="color:#00d9ff;font-size:10px;">⛈ Monsoon</span>' : ''}<br/>` +
+                `Avg ${prop.label.split('(')[0].trim()}: <b>${d.val.toFixed(2)}</b><br/>` +
+                `<em style="color:#8b9dc3;font-size:10px;">${isActive ? '🔍 Filtered — click to clear' : '🖱️ Click to filter diurnal chart'}</em>`);
         })
-        .on('mouseout', function () { d3.select(this).attr('opacity', 1); hideTooltip(); });
+        .on('mousemove', function (event) { moveTooltip(event); })
+        .on('mouseout', function (event, d) {
+            d3.select(this).attr('opacity', (!spatialFilterMonth || spatialFilterMonth === d.month) ? 1 : 0.25);
+            hideTooltip();
+        })
+        // === CROSS-FILTER CLICK ===
+        .on('click', function (event, d) {
+            hideTooltip();
+            // Toggle: click same month again to clear
+            spatialFilterMonth = (spatialFilterMonth === d.month) ? null : d.month;
+            // Redraw bar chart to update highlights, then redraw diurnal
+            createSeasonalHeatmap(metric);
+            createDiurnalChart(metric);
+        });
 
     svg.selectAll('.mval').data(monthlyAvg).enter().append('text')
         .attr('x', d => xScale(monthNames[d.month - 1]) + xScale.bandwidth() / 2)
         .attr('y', d => yScale(d.val) - 4).attr('text-anchor', 'middle')
         .style('fill', '#e8f1ff').style('font-size', '9px').style('font-weight', '600')
+        .attr('opacity', d => (!spatialFilterMonth || spatialFilterMonth === d.month) ? 1 : 0.25)
         .text(d => d.val.toFixed(1));
+
+    // Gradient color-scale legend below x-axis
+    const lgW = Math.min(240, width * 0.55);
+    const lgX = (width - lgW) / 2;
+    const lgY = height + 68;
+    const lgDefs = svg.append('defs');
+    const lgId = `lgGrad_${metric}`;
+    const lgGrad = lgDefs.append('linearGradient').attr('id', lgId).attr('x1', '0%').attr('x2', '100%');
+    // Sample 10 stops across the color scheme
+    for (let i = 0; i <= 10; i++) {
+        lgGrad.append('stop').attr('offset', `${i * 10}%`)
+            .attr('stop-color', prop.colorScheme(i / 10));
+    }
+    svg.append('rect').attr('x', lgX).attr('y', lgY)
+        .attr('width', lgW).attr('height', 10).attr('rx', 4)
+        .attr('fill', `url(#${lgId})`);
+    svg.append('text').attr('x', lgX).attr('y', lgY + 24)
+        .style('fill', '#8b9dc3').style('font-size', '10px').style('font-weight', '600')
+        .text(`Low (${valMin.toFixed(1)})`);
+    svg.append('text').attr('x', lgX + lgW).attr('y', lgY + 24)
+        .attr('text-anchor', 'end').style('fill', '#8b9dc3').style('font-size', '10px').style('font-weight', '600')
+        .text(`High (${valMax.toFixed(1)})`);
+    svg.append('text').attr('x', lgX + lgW / 2).attr('y', lgY - 5)
+        .attr('text-anchor', 'middle').style('fill', '#8b9dc3').style('font-size', '10px')
+        .text(`Color scale: ${prop.label}`);
+
+    // Instruction hint below the chart
+    const hintText = spatialFilterMonth
+        ? `🔍 Showing diurnal pattern for ${monthNames[spatialFilterMonth - 1]} — click the same bar or the banner above to clear`
+        : '🖱️ Click any month bar to filter the diurnal chart above to that month';
+    d3.select('#spatialSeasonalChart').selectAll('.filter-hint').remove();
+    d3.select('#spatialSeasonalChart').append('div')
+        .attr('class', 'filter-hint')
+        .style('text-align', 'center')
+        .style('font-size', '11px')
+        .style('color', spatialFilterMonth ? '#00d9ff' : '#8b9dc3')
+        .style('margin-top', '6px')
+        .style('font-family', 'Inter, sans-serif')
+        .style('letter-spacing', '0.5px')
+        .text(hintText);
 }
 
 // ==================== MONSOON ANALYSIS ====================
@@ -536,16 +705,48 @@ function createRainfallYearly() {
     svg.append('path').datum(data).attr('fill', 'url(#rfGrad)').attr('d', area);
     svg.append('path').datum(data).attr('fill', 'none').attr('stroke', '#9d4edd').attr('stroke-width', 2.5).attr('d', line);
 
-    // ALL dots same uniform colour — NO red extreme highlights
-    svg.selectAll('.dot').data(data).enter().append('circle')
+    // Visible dots
+    svg.selectAll('.dot-vis').data(data).enter().append('circle')
+        .attr('class', 'dot-vis')
         .attr('cx', d => xScale(d.year)).attr('cy', d => yScale(d.rainfall))
         .attr('r', 4).attr('fill', '#9d4edd').attr('stroke', '#0a0e1a').attr('stroke-width', 1.5)
-        .style('cursor', 'pointer')
+        .style('pointer-events', 'none');
+
+    // Large invisible hit-area
+    svg.selectAll('.dot-hit').data(data).enter().append('circle')
+        .attr('class', 'dot-hit')
+        .attr('cx', d => xScale(d.year)).attr('cy', d => yScale(d.rainfall))
+        .attr('r', 12).attr('fill', 'transparent').style('cursor', 'pointer')
         .on('mouseover', function (event, d) {
-            d3.select(this).attr('r', 7).attr('fill', '#c77dff');
-            showTooltip(event, `<strong>Year ${d.year}</strong><br/>Estimated Rainfall: ${d.rainfall.toFixed(0)} mm<br/><em style="color:#8b9dc3;font-size:10px;">Derived from Weather Phrase column</em>`);
+            svg.selectAll('.dot-vis').filter(v => v.year === d.year)
+                .transition().duration(150).attr('r', 7).attr('fill', '#c77dff');
+            showTooltip(event,
+                `<strong>🌧️ Year ${d.year}</strong><br/>` +
+                `Estimated Rainfall: <b>${d.rainfall.toFixed(0)} mm</b><br/>` +
+                `<em style="color:#8b9dc3;font-size:10px;">Derived from Weather Phrase column</em>`);
         })
-        .on('mouseout', function () { d3.select(this).attr('r', 4).attr('fill', '#9d4edd'); hideTooltip(); });
+        .on('mousemove', function (event) { moveTooltip(event); })
+        .on('mouseout', function (event, d) {
+            svg.selectAll('.dot-vis').filter(v => v.year === d.year)
+                .transition().duration(150).attr('r', 4).attr('fill', '#9d4edd');
+            hideTooltip();
+        });
+    // Compact top-right legend
+    const leg = svg.append('g').attr('transform', `translate(${width - 160}, 8)`);
+    leg.append('rect').attr('width', 158).attr('height', 50).attr('rx', 6)
+        .attr('fill', 'rgba(10,14,26,0.7)').attr('stroke', 'rgba(157,78,221,0.4)').attr('stroke-width', 1);
+    // Area swatch
+    leg.append('rect').attr('x', 10).attr('y', 10).attr('width', 20).attr('height', 10).attr('rx', 2)
+        .attr('fill', '#9d4edd').attr('opacity', 0.35);
+    // Line on top of swatch
+    leg.append('line').attr('x1', 10).attr('x2', 30).attr('y1', 15).attr('y2', 15)
+        .attr('stroke', '#9d4edd').attr('stroke-width', 2.5);
+    leg.append('text').attr('x', 36).attr('y', 19)
+        .style('fill', '#e8f1ff').style('font-size', '10px').style('font-weight', '600')
+        .text('Annual Rainfall (est.)');
+    leg.append('text').attr('x', 10).attr('y', 40)
+        .style('fill', '#8b9dc3').style('font-size', '9px').style('font-style', 'italic')
+        .text('Derived from Weather Phrase');
 }
 
 function createRainfallMonthly() {
@@ -579,12 +780,41 @@ function createRainfallMonthly() {
         .attr('height', d => height - yScale(d.rainfall))
         .attr('fill', d => (d.month >= 6 && d.month <= 9) ? '#00d9ff' : '#9d4edd')
         .attr('opacity', 0.75).attr('rx', 3)
+        .style('cursor', 'pointer')
         .on('mouseover', function (event, d) {
             d3.select(this).attr('opacity', 1);
-            showTooltip(event, `<strong>${monthNames[d.month - 1]}</strong><br/>Avg Rainfall: ${d.rainfall.toFixed(2)} mm`);
+            const isMonsoon = d.month >= 6 && d.month <= 9;
+            showTooltip(event,
+                `<strong>📅 ${monthNames[d.month - 1]}</strong>${isMonsoon ? ' <span style="color:#00d9ff;font-size:10px;">⛈ Monsoon</span>' : ''}<br/>` +
+                `Avg Rainfall: <b>${d.rainfall.toFixed(2)} mm</b>`);
         })
+        .on('mousemove', function (event) { moveTooltip(event); })
         .on('mouseout', function () { d3.select(this).attr('opacity', 0.75); hideTooltip(); });
+
+    // Categorical legend — top right
+    const leg = svg.append('g').attr('transform', `translate(${width - 178}, 16)`);
+    leg.append('rect').attr('width', 176).attr('height', 68).attr('rx', 7)
+        .attr('fill', 'rgba(10,14,26,0.75)').attr('stroke', 'rgba(0,217,255,0.25)').attr('stroke-width', 1);
+    const legItems = [
+        { color: '#00d9ff', label: 'Monsoon Month (Jun–Sep)', shape: 'rect' },
+        { color: '#9d4edd', label: 'Non-Monsoon Month',       shape: 'rect' },
+        { color: '#ffb627', label: 'Monsoon Season Window',   shape: 'dash' }
+    ];
+    legItems.forEach(({ color, label, shape }, i) => {
+        if (shape === 'rect') {
+            leg.append('rect').attr('x', 10).attr('y', 10 + i * 18).attr('width', 14).attr('height', 10)
+                .attr('rx', 2).attr('fill', color).attr('opacity', 0.8);
+        } else {
+            leg.append('line').attr('x1', 10).attr('x2', 24)
+                .attr('y1', 15 + i * 18).attr('y2', 15 + i * 18)
+                .attr('stroke', color).attr('stroke-width', 2)
+                .attr('stroke-dasharray', '4,3').attr('opacity', 0.85);
+        }
+        leg.append('text').attr('x', 30).attr('y', 19 + i * 18)
+            .style('fill', '#c8d8f0').style('font-size', '9.5px').text(label);
+    });
 }
+
 
 // Rainfall boxplot with decade selector — no horizontal scroll
 // Decade buttons are wired up in initAllControls
@@ -680,27 +910,41 @@ function createRainfallVariability() {
             .attr('stroke', '#00d9ff').attr('stroke-width', 1.5).attr('opacity', 0.5);
 
         // IQR Box
-        svg.append('rect')
+        const iqrBox = svg.append('rect')
             .attr('x', xScale(d.year)).attr('y', yScale(d.q3))
             .attr('width', bw).attr('height', Math.max(1, yScale(d.q1) - yScale(d.q3)))
             .attr('fill', '#00d9ff').attr('opacity', 0.22)
             .attr('stroke', '#00d9ff').attr('stroke-width', 1.5)
             .attr('rx', 3)
-            .style('cursor', 'pointer')
-            .on('mouseover', function (event) {
-                d3.select(this).attr('opacity', 0.45).attr('stroke-width', 2.5);
-                showTooltip(event, `<strong>Year ${d.year}</strong><br/>Max: ${d.max.toFixed(1)} mm<br/>Q3: ${d.q3.toFixed(1)} mm<br/>Median: ${d.median.toFixed(1)} mm<br/>Q1: ${d.q1.toFixed(1)} mm<br/>Min: ${d.min.toFixed(1)} mm`);
-            })
-            .on('mouseout', function () {
-                d3.select(this).attr('opacity', 0.22).attr('stroke-width', 1.5);
-                hideTooltip();
-            });
+            .style('pointer-events', 'none');
 
         // Median line
         svg.append('line')
             .attr('x1', xScale(d.year)).attr('x2', xScale(d.year) + bw)
             .attr('y1', yScale(d.median)).attr('y2', yScale(d.median))
-            .attr('stroke', '#ff6b9d').attr('stroke-width', 2.5);
+            .attr('stroke', '#ff6b9d').attr('stroke-width', 2.5)
+            .style('pointer-events', 'none');
+
+        // Full-height invisible overlay covers whisker + box + median — reliable hover zone
+        svg.append('rect')
+            .attr('x', xScale(d.year)).attr('y', yScale(d.max))
+            .attr('width', bw).attr('height', Math.max(1, yScale(d.min) - yScale(d.max)))
+            .attr('fill', 'transparent').style('cursor', 'pointer')
+            .on('mouseover', function (event) {
+                iqrBox.attr('opacity', 0.45).attr('stroke-width', 2.5);
+                showTooltip(event,
+                    `<strong>📦 Year ${d.year}</strong><br/>` +
+                    `🔺 Max: ${d.max.toFixed(1)} mm<br/>` +
+                    `Q3: ${d.q3.toFixed(1)} mm<br/>` +
+                    `📍 Median: <b>${d.median.toFixed(1)} mm</b><br/>` +
+                    `Q1: ${d.q1.toFixed(1)} mm<br/>` +
+                    `🔻 Min: ${d.min.toFixed(1)} mm`);
+            })
+            .on('mousemove', function (event) { moveTooltip(event); })
+            .on('mouseout', function () {
+                iqrBox.attr('opacity', 0.22).attr('stroke-width', 1.5);
+                hideTooltip();
+            });
     });
 
     // Legend
@@ -792,7 +1036,7 @@ function createInteractiveMap() {
     legend.onAdd = function () {
         const div = L.DomUtil.create('div', 'map-zone-legend');
         div.innerHTML = `
-            <div style="background:rgba(10,14,26,0.9);backdrop-filter:blur(10px);padding:12px 16px;border-radius:10px;border:1px solid rgba(0,217,255,0.3);font-family:Rajdhani,sans-serif;">
+            <div style="background:rgba(10,14,26,0.9);backdrop-filter:blur(10px);padding:12px 16px;border-radius:10px;border:1px solid rgba(0,217,255,0.3);font-family:Inter,sans-serif;">
                 <div style="font-size:11px;font-weight:700;color:#00d9ff;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Mumbai Zones</div>
                 <div style="display:flex;flex-direction:column;gap:5px;">
                     <div style="display:flex;align-items:center;gap:8px;"><span style="width:12px;height:12px;border-radius:50%;background:#00d9ff;display:inline-block;box-shadow:0 0 6px #00d9ff;"></span><span style="color:#e8f1ff;font-size:12px;">South Mumbai</span></div>
@@ -885,7 +1129,7 @@ function createInteractiveMap() {
             marker.on('mouseout', function () { this.setRadius(10); });
 
             marker.bindPopup(`
-                <div style="font-family:Rajdhani,sans-serif;min-width:210px;font-size:13px;">
+                <div style="font-family:Inter,sans-serif;min-width:210px;font-size:13px;">
                     <strong style="color:${zoneColors[loc.zone]};font-size:16px;">${loc.name}</strong><br/>
                     <span style="color:#888;font-size:11px;">${loc.zone} · ${wx.dataDate ? wx.dataDate.toLocaleString() : ''}</span>
                     <hr style="margin:7px 0;border:none;border-top:1px solid #ddd;">
@@ -993,7 +1237,7 @@ function createCorrelationMatrix() {
             .attr('x', d => d.col * cellSize + cellSize / 2)
             .attr('y', d => d.row * cellSize + cellSize / 2)
             .attr('text-anchor', 'middle').attr('dy', '0.35em')
-            .style('fill', d => Math.abs(d.value) > 0.45 ? '#0a0e1a' : '#e8f1ff')
+            .style('fill', d => Math.abs(d.value) < 0.6 ? '#0a0e1a' : '#e8f1ff')
             .style('font-size', `${Math.min(cellSize * 0.18, 13)}px`)
             .style('font-weight', '700').style('pointer-events', 'none')
             .text(d => d.value.toFixed(2));
@@ -1021,7 +1265,7 @@ function createCorrelationMatrix() {
     svg.append('text').attr('x', matrixW / 2).attr('y', -labelH + 16)
         .attr('text-anchor', 'middle')
         .style('fill', '#e8f1ff').style('font-size', '14px').style('font-weight', '700')
-        .style('font-family', 'Orbitron, monospace')
+        .style('font-family', 'Inter, sans-serif')
         .text('🔗 Pearson Correlation Matrix — All Meteorological Variables');
 
     // Colour legend bar
@@ -1064,10 +1308,20 @@ function showTooltip(event, html) {
     if (!tooltip) {
         tooltip = d3.select('body').append('div').attr('class', 'tooltip').style('opacity', 0);
     }
+    const px = event.pageX || (event.clientX + window.scrollX);
+    const py = event.pageY || (event.clientY + window.scrollY);
     tooltip.html(html)
-        .style('left', (event.pageX + 15) + 'px')
-        .style('top', (event.pageY - 28) + 'px')
-        .transition().duration(200).style('opacity', 1);
+        .style('left', (px + 15) + 'px')
+        .style('top', (py - 40) + 'px')
+        .transition().duration(150).style('opacity', 1);
+}
+function moveTooltip(event) {
+    if (!tooltip) return;
+    const px = event.pageX || (event.clientX + window.scrollX);
+    const py = event.pageY || (event.clientY + window.scrollY);
+    tooltip
+        .style('left', (px + 15) + 'px')
+        .style('top', (py - 40) + 'px');
 }
 function hideTooltip() {
     if (tooltip) tooltip.transition().duration(200).style('opacity', 0);
