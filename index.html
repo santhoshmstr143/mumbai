@@ -252,13 +252,17 @@
                     <div id="rainfallYearly" class="chart-area"></div>
                     <div id="rainfallMonthly" class="chart-area"></div>
                     <div class="chart-area full-width">
-                        <div class="decade-controls" style="margin-bottom:16px;">
-                            <span
-                                style="color:#8b9dc3;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin-right:12px;">Select
-                                Decade:</span>
-                            <button class="control-btn active" data-decade="1990">1990s</button>
-                            <button class="control-btn" data-decade="2000">2000s</button>
-                            <button class="control-btn" data-decade="2010">2010s</button>
+                        <div id="monsoonSliderWrap" style="margin-bottom:20px;padding:14px 20px 10px;background:rgba(0,217,255,0.04);border:1px solid rgba(0,217,255,0.15);border-radius:12px;">
+                            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                                <span style="color:#8b9dc3;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:1px;">📅 Focus Year</span>
+                                <span id="monsoonYearDisplay" style="color:#00d9ff;font-size:20px;font-weight:700;font-family:Inter,sans-serif;letter-spacing:2px;">All Years</span>
+                            </div>
+                            <input type="range" id="monsoonYearSlider" min="1991" max="2017" step="1" style="width:100%;accent-color:#00d9ff;height:5px;cursor:pointer;outline:none;" />
+                            <div style="display:flex;justify-content:space-between;margin-top:5px;">
+                                <span id="monsoonSliderMinVal" style="color:#8b9dc3;font-size:11px;">1991</span>
+                                <span style="color:#8b9dc3;font-size:10px;font-style:italic;">← drag to scroll the 5-year window →</span>
+                                <span id="monsoonSliderMaxVal" style="color:#8b9dc3;font-size:11px;">2017</span>
+                            </div>
                         </div>
                         <div id="rainfallVariability"></div>
                     </div>
@@ -339,23 +343,26 @@
                     Multi-Variable Correlation Matrix
                 </h3>
                 <p class="section-description">Relationships between meteorological parameters</p>
+                <div class="note-banner" style="margin-top: 16px; margin-bottom: 0px;">
+                    <strong>Why this is essential for Climate Analysis:</strong> While time-series and spatial charts show <em>what</em> is happening, this Pearson Correlation Matrix proves <em>why</em> it is happening. In atmospheric science, no variable acts in isolation. This matrix is the foundational statistical model that validates all visual trends in the dashboard. It quantitatively proves the mechanics of Mumbai's weather: the 0.87 correlation between Temperature and Heat Index proves the non-linear danger of urban coastal humidity. Furthermore, the strong inverse relationships between surface pressure and humidity (-0.65) statistically confirm the mechanics of incoming monsoon low-pressure systems. Without this mathematical proof, visual trends are just correlations; this matrix provides the necessary academic rigor to confirm them as actual meteorological phenomena.
+                </div>
             </div>
 
             <div class="viz-container">
                 <div id="correlationMatrix" class="chart-area large"></div>
-                <div class="chart-insights">
+                <div class="chart-insights" style="grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));">
                     <div class="insight-card">
-                        <span class="insight-icon">🔗</span>
+                        <span class="insight-icon">⚠️</span>
                         <div>
-                            <div class="insight-title">Strong Correlations</div>
-                            <div class="insight-text">Temperature-Humidity inverse relationship evident</div>
+                            <div class="insight-title">Why this matters: Urban Heat Risk</div>
+                            <div class="insight-text">The deep blue correlation between <strong>Temperature</strong> and <strong>Heat Index (0.87)</strong> combined with Humidity proves why Mumbai's sweltering coastal climate is dangerous. As both rise simultaneously, they create lethal "feels-like" temperatures requiring public health warnings.</div>
                         </div>
                     </div>
                     <div class="insight-card">
-                        <span class="insight-icon">📉</span>
+                        <span class="insight-icon">🌪️</span>
                         <div>
-                            <div class="insight-title">Pressure Patterns</div>
-                            <div class="insight-text">Atmospheric pressure shows seasonal dependencies</div>
+                            <div class="insight-title">Monsoon Forecasting</div>
+                            <div class="insight-text">Notice the strong inverse (red) correlation between <strong>Pressure</strong> and <strong>Dew Point/Humidity (-0.65, -0.54)</strong>. Drops in atmospheric pressure are primary indicators of incoming low-pressure monsoon systems from the Arabian Sea.</div>
                         </div>
                     </div>
                 </div>

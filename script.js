@@ -146,14 +146,16 @@ function initAllControls() {
                 createSpatialPatterns();
             });
         });
-        // Decade selector for rainfall variability boxplot
-        document.querySelectorAll('#monsoon .decade-controls .control-btn').forEach(btn => {
-            btn.addEventListener('click', function () {
-                document.querySelectorAll('#monsoon .decade-controls .control-btn').forEach(b => b.classList.remove('active'));
-                this.classList.add('active');
-                createRainfallVariability();
+        // Monsoon boxplot scroll slider
+        const slider = document.getElementById('monsoonYearSlider');
+        if (slider) {
+            slider.addEventListener('input', function () {
+                // Slider value is the START year of the 5-year window
+                monsoonScrollStartYear = parseInt(this.value);
+                document.getElementById('monsoonYearDisplay').textContent = `${monsoonScrollStartYear} – ${monsoonScrollStartYear + 4}`;
+                updateRainfallBoxplot(); // smoothly move window to new years
             });
-        });
+        }
     }, 500);
 }
 
@@ -816,23 +818,25 @@ function createRainfallMonthly() {
 }
 
 
-// Rainfall boxplot with decade selector — no horizontal scroll
-// Decade buttons are wired up in initAllControls
+// ==================== RAINFALL VARIABILITY BOXPLOT ====================
+// Shows 5 years at a time, scrollable via the top slider. Uses D3 Update Pattern.
+let monsoonScrollStartYear = 1991;
+let boxplotSvgGrp = null;
+let boxplotXScale = null;
+let boxplotYScale = null;
+let boxplotAllStats = [];
+
 function createRainfallVariability() {
     const wrapId = 'rainfallVariability';
     const wrapper = document.getElementById(wrapId);
     if (!wrapper) return;
 
-    // Determine selected decade from active button
-    const activeDecadeBtn = document.querySelector('#monsoon .decade-controls .control-btn.active');
-    const selectedDecade = activeDecadeBtn ? parseInt(activeDecadeBtn.getAttribute('data-decade')) : null;
-
-    // Clear wrapper
-    wrapper.innerHTML = '';
+    wrapper.innerHTML = ''; // Only clear on initial deep re-render
     wrapper.style.overflowX = 'hidden';
     wrapper.style.overflowY = 'hidden';
 
-    const allYearlyStats = Array.from(d3.group(weatherData, d => d.year), ([year, vals]) => {
+    // Calculate all years once
+    boxplotAllStats = Array.from(d3.group(weatherData, d => d.year), ([year, vals]) => {
         const rf = vals.map(d => d.rainfall).sort(d3.ascending);
         return {
             year,
@@ -844,116 +848,244 @@ function createRainfallVariability() {
         };
     }).sort((a, b) => a.year - b.year);
 
-    // Filter to selected decade
-    const yearlyStats = selectedDecade
-        ? allYearlyStats.filter(d => Math.floor(d.year / 10) * 10 === selectedDecade)
-        : allYearlyStats;
-
-    if (!yearlyStats.length) {
-        wrapper.innerHTML = '<div style="color:#8b9dc3;text-align:center;padding:40px;">No data for selected decade</div>';
+    if (!boxplotAllStats.length) {
+        wrapper.innerHTML = '<div style="color:#8b9dc3;text-align:center;padding:40px;">No data available for boxplot.</div>';
         return;
     }
 
-    const margin = { top: 45, right: 30, bottom: 65, left: 70 };
-    const totalHeight = 550;
+    const minYear = boxplotAllStats[0].year;
+    const maxYear = boxplotAllStats[boxplotAllStats.length - 1].year;
+    
+    // Update slider bounds based on data range
+    const slider = document.getElementById('monsoonYearSlider');
+    if (slider && !slider.hasAttribute('data-initialized')) {
+        slider.min = minYear;
+        slider.max = Math.max(minYear, maxYear - 4); // Ensure at least 5 years can be shown
+        slider.value = minYear;
+        monsoonScrollStartYear = minYear;
+        slider.setAttribute('data-initialized', 'true');
+        
+        document.getElementById('monsoonSliderMinVal').textContent = minYear;
+        document.getElementById('monsoonSliderMaxVal').textContent = maxYear - 4;
+        document.getElementById('monsoonYearDisplay').textContent = `${minYear} – ${minYear + 4}`;
+
+        slider.addEventListener('input', function() {
+            monsoonScrollStartYear = parseInt(this.value);
+            document.getElementById('monsoonYearDisplay').textContent = `${monsoonScrollStartYear} – ${monsoonScrollStartYear + 4}`;
+            updateRainfallBoxplot();
+        });
+    }
+
+    const margin = { top: 55, right: 30, bottom: 65, left: 70 };
+    const totalHeight = 560;
     const containerWidth = wrapper.getBoundingClientRect().width;
     const innerW = containerWidth - margin.left - margin.right;
     const innerH = totalHeight - margin.top - margin.bottom;
 
     const svgEl = d3.select(wrapper).append('svg')
-        .attr('width', containerWidth)
-        .attr('height', totalHeight);
-    const svg = svgEl.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+        .attr('width', containerWidth).attr('height', totalHeight);
+    boxplotSvgGrp = svgEl.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
 
-    const xScale = d3.scaleBand().domain(yearlyStats.map(d => d.year)).range([0, innerW]).padding(0.25);
-    const yScale = d3.scaleLinear().domain([0, d3.max(yearlyStats, d => d.max) * 1.1]).range([innerH, 0]);
+    // Setup persistent scales
+    boxplotXScale = d3.scaleBand().range([0, innerW]).padding(0.18);
+    boxplotYScale = d3.scaleLinear().domain([0, d3.max(boxplotAllStats, d => d.max) * 1.1]).range([innerH, 0]);
 
-    // Grid
-    svg.append('g').attr('class', 'grid').attr('opacity', 0.08)
-        .call(d3.axisLeft(yScale).tickSize(-innerW).tickFormat(''));
+    // Background Grid
+    boxplotSvgGrp.append('g').attr('class', 'grid').attr('opacity', 0.08)
+        .call(d3.axisLeft(boxplotYScale).tickSize(-innerW).tickFormat(''));
 
-    // Axes
-    svg.append('g').attr('class', 'axis').attr('transform', `translate(0,${innerH})`).call(d3.axisBottom(xScale).tickFormat(d3.format('d')));
-    svg.append('g').attr('class', 'axis').call(d3.axisLeft(yScale));
+    // Persistent Axes
+    boxplotSvgGrp.append('g').attr('class', 'x-axis').attr('transform', `translate(0,${innerH})`);
+    boxplotSvgGrp.append('g').attr('class', 'y-axis').call(d3.axisLeft(boxplotYScale));
 
     // Axis labels
-    svg.append('text').attr('transform', 'rotate(-90)').attr('x', -innerH / 2).attr('y', -55)
+    boxplotSvgGrp.append('text').attr('transform', 'rotate(-90)').attr('x', -innerH / 2).attr('y', -55)
         .attr('text-anchor', 'middle').style('fill', '#8b9dc3').style('font-size', '11px').text('Rainfall (mm)');
-    svg.append('text').attr('x', innerW / 2).attr('y', innerH + 45)
-        .attr('text-anchor', 'middle').style('fill', '#8b9dc3').style('font-size', '11px')
-        .text(selectedDecade ? `Years in the ${selectedDecade}s` : 'Year');
+    boxplotSvgGrp.append('text').attr('x', innerW / 2).attr('y', innerH + 45)
+        .attr('text-anchor', 'middle').style('fill', '#8b9dc3').style('font-size', '11px').text('Year');
 
-    const titleDecade = selectedDecade ? ` — ${selectedDecade}s` : ' — All Years';
-    addTitle(svg, innerW, `📦 Rainfall Variability Boxplot${titleDecade}`);
-
-    // Draw each box
-    yearlyStats.forEach(d => {
-        const cx = xScale(d.year) + xScale.bandwidth() / 2;
-        const bw = xScale.bandwidth();
-
-        // Whisker line
-        svg.append('line')
-            .attr('x1', cx).attr('x2', cx)
-            .attr('y1', yScale(d.max)).attr('y2', yScale(d.min))
-            .attr('stroke', '#00d9ff').attr('stroke-width', 1.5).attr('opacity', 0.5);
-
-        // Top whisker cap
-        svg.append('line')
-            .attr('x1', cx - bw * 0.3).attr('x2', cx + bw * 0.3)
-            .attr('y1', yScale(d.max)).attr('y2', yScale(d.max))
-            .attr('stroke', '#00d9ff').attr('stroke-width', 1.5).attr('opacity', 0.5);
-
-        // Bottom whisker cap
-        svg.append('line')
-            .attr('x1', cx - bw * 0.3).attr('x2', cx + bw * 0.3)
-            .attr('y1', yScale(d.min)).attr('y2', yScale(d.min))
-            .attr('stroke', '#00d9ff').attr('stroke-width', 1.5).attr('opacity', 0.5);
-
-        // IQR Box
-        const iqrBox = svg.append('rect')
-            .attr('x', xScale(d.year)).attr('y', yScale(d.q3))
-            .attr('width', bw).attr('height', Math.max(1, yScale(d.q1) - yScale(d.q3)))
-            .attr('fill', '#00d9ff').attr('opacity', 0.22)
-            .attr('stroke', '#00d9ff').attr('stroke-width', 1.5)
-            .attr('rx', 3)
-            .style('pointer-events', 'none');
-
-        // Median line
-        svg.append('line')
-            .attr('x1', xScale(d.year)).attr('x2', xScale(d.year) + bw)
-            .attr('y1', yScale(d.median)).attr('y2', yScale(d.median))
-            .attr('stroke', '#ff6b9d').attr('stroke-width', 2.5)
-            .style('pointer-events', 'none');
-
-        // Full-height invisible overlay covers whisker + box + median — reliable hover zone
-        svg.append('rect')
-            .attr('x', xScale(d.year)).attr('y', yScale(d.max))
-            .attr('width', bw).attr('height', Math.max(1, yScale(d.min) - yScale(d.max)))
-            .attr('fill', 'transparent').style('cursor', 'pointer')
-            .on('mouseover', function (event) {
-                iqrBox.attr('opacity', 0.45).attr('stroke-width', 2.5);
-                showTooltip(event,
-                    `<strong>📦 Year ${d.year}</strong><br/>` +
-                    `🔺 Max: ${d.max.toFixed(1)} mm<br/>` +
-                    `Q3: ${d.q3.toFixed(1)} mm<br/>` +
-                    `📍 Median: <b>${d.median.toFixed(1)} mm</b><br/>` +
-                    `Q1: ${d.q1.toFixed(1)} mm<br/>` +
-                    `🔻 Min: ${d.min.toFixed(1)} mm`);
-            })
-            .on('mousemove', function (event) { moveTooltip(event); })
-            .on('mouseout', function () {
-                iqrBox.attr('opacity', 0.22).attr('stroke-width', 1.5);
-                hideTooltip();
-            });
-    });
+    // Title container
+    boxplotSvgGrp.append('text').attr('class', 'chart-dyn-title')
+        .attr('x', 0).attr('y', -24).style('fill', '#e8f1ff').style('font-size', '14px')
+        .style('font-weight', '700').style('font-family', 'Inter, sans-serif')
+        .style('letter-spacing', '0.5px');
 
     // Legend
-    const leg = svg.append('g').attr('transform', `translate(${innerW - 140}, -30)`);
+    const leg = boxplotSvgGrp.append('g').attr('transform', `translate(${innerW - 145}, -40)`);
     [{ label: 'Median', color: '#ff6b9d' }, { label: 'IQR Box (Q1–Q3)', color: '#00d9ff' }, { label: 'Whisker (Min–Max)', color: '#00d9ff' }]
         .forEach(({ label, color }, i) => {
             leg.append('line').attr('x1', 0).attr('x2', 18).attr('y1', i * 16).attr('y2', i * 16)
                 .attr('stroke', color).attr('stroke-width', i === 0 ? 2.5 : 1.5);
             leg.append('text').attr('x', 22).attr('y', i * 16 + 4).style('fill', '#8b9dc3').style('font-size', '9px').text(label);
+        });
+
+    // Content container for D3 updates
+    boxplotSvgGrp.append('g').attr('class', 'box-content-layer');
+
+    // Draw the initial state
+    updateRainfallBoxplot();
+}
+
+// Function called on slider scroll — updates domain and transitions shapes
+function updateRainfallBoxplot() {
+    if (!boxplotSvgGrp) return;
+
+    // Filter to the 5-year window
+    const yearlyStats = boxplotAllStats.filter(d => 
+        d.year >= monsoonScrollStartYear && d.year <= monsoonScrollStartYear + 4
+    );
+
+    // Update X Domain
+    boxplotXScale.domain(yearlyStats.map(d => d.year));
+
+    // Transition X Axis
+    boxplotSvgGrp.select('.x-axis').transition().duration(250)
+        .call(d3.axisBottom(boxplotXScale).tickFormat(d3.format('d')));
+
+    // Update Title
+    boxplotSvgGrp.select('.chart-dyn-title')
+        .text(`📦 Rainfall Variability Boxplot (${monsoonScrollStartYear} – ${monsoonScrollStartYear + 4})`);
+
+    const layer = boxplotSvgGrp.select('.box-content-layer');
+
+    // ====== CENTER WHISKERS ======
+    const whiskers = layer.selectAll('.rf-whisker-main').data(yearlyStats, d => d.year);
+    whiskers.enter().append('line').attr('class', 'rf-whisker-main rf-whisker').attr('data-year', d => d.year)
+        .attr('stroke', '#00d9ff').attr('stroke-width', 1.5).attr('opacity', 0)
+        .attr('x1', d => boxplotXScale(d.year) + boxplotXScale.bandwidth() / 2)
+        .attr('x2', d => boxplotXScale(d.year) + boxplotXScale.bandwidth() / 2)
+        .attr('y1', d => boxplotYScale(d.max)).attr('y2', d => boxplotYScale(d.min))
+        .merge(whiskers).transition().duration(250)
+        .attr('opacity', 0.45)
+        .attr('x1', d => boxplotXScale(d.year) + boxplotXScale.bandwidth() / 2)
+        .attr('x2', d => boxplotXScale(d.year) + boxplotXScale.bandwidth() / 2);
+    whiskers.exit().transition().duration(250).attr('opacity', 0).remove();
+
+    // ====== TOP CAPS ======
+    const tCaps = layer.selectAll('.rf-whisker-top').data(yearlyStats, d => d.year);
+    tCaps.enter().append('line').attr('class', 'rf-whisker-top rf-whisker').attr('data-year', d => d.year)
+        .attr('stroke', '#00d9ff').attr('stroke-width', 1.5).attr('opacity', 0)
+        .attr('y1', d => boxplotYScale(d.max)).attr('y2', d => boxplotYScale(d.max))
+        .merge(tCaps).transition().duration(250)
+        .attr('opacity', 0.45)
+        .attr('x1', d => boxplotXScale(d.year) + boxplotXScale.bandwidth() * 0.2)
+        .attr('x2', d => boxplotXScale(d.year) + boxplotXScale.bandwidth() * 0.8);
+    tCaps.exit().transition().duration(250).attr('opacity', 0).remove();
+
+    // ====== BOTTOM CAPS ======
+    const bCaps = layer.selectAll('.rf-whisker-bot').data(yearlyStats, d => d.year);
+    bCaps.enter().append('line').attr('class', 'rf-whisker-bot rf-whisker').attr('data-year', d => d.year)
+        .attr('stroke', '#00d9ff').attr('stroke-width', 1.5).attr('opacity', 0)
+        .attr('y1', d => boxplotYScale(d.min)).attr('y2', d => boxplotYScale(d.min))
+        .merge(bCaps).transition().duration(250)
+        .attr('opacity', 0.45)
+        .attr('x1', d => boxplotXScale(d.year) + boxplotXScale.bandwidth() * 0.2)
+        .attr('x2', d => boxplotXScale(d.year) + boxplotXScale.bandwidth() * 0.8);
+    bCaps.exit().transition().duration(250).attr('opacity', 0).remove();
+
+    // ====== IQR BOXES ======
+    const boxes = layer.selectAll('.rf-iqr-box').data(yearlyStats, d => d.year);
+    boxes.enter().append('rect').attr('class', 'rf-iqr-box').attr('data-year', d => d.year)
+        .attr('fill', '#00d9ff').attr('stroke', '#00d9ff').attr('stroke-width', 1.2).attr('rx', 2).attr('opacity', 0)
+        .attr('y', d => boxplotYScale(d.q3)).attr('height', d => Math.max(1, boxplotYScale(d.q1) - boxplotYScale(d.q3)))
+        .style('pointer-events', 'none')
+        .merge(boxes).transition().duration(250)
+        .attr('opacity', 0.22)
+        .attr('x', d => boxplotXScale(d.year)).attr('width', boxplotXScale.bandwidth());
+    boxes.exit().transition().duration(250).attr('opacity', 0).remove();
+
+    // ====== MEDIAN LINES ======
+    const medians = layer.selectAll('.rf-median').data(yearlyStats, d => d.year);
+    medians.enter().append('line').attr('class', 'rf-median').attr('data-year', d => d.year)
+        .attr('stroke', '#ff6b9d').attr('stroke-width', 2).style('pointer-events', 'none').attr('opacity', 0)
+        .attr('y1', d => boxplotYScale(d.median)).attr('y2', d => boxplotYScale(d.median))
+        .merge(medians).transition().duration(250)
+        .attr('opacity', 1)
+        .attr('x1', d => boxplotXScale(d.year)).attr('x2', d => boxplotXScale(d.year) + boxplotXScale.bandwidth());
+    medians.exit().transition().duration(250).attr('opacity', 0).remove();
+
+    // ====== INTERACTIVE OVERLAYS ======
+    const overlays = layer.selectAll('.rf-overlay').data(yearlyStats, d => d.year);
+    overlays.enter().append('rect').attr('class', 'rf-overlay').attr('data-year', d => d.year)
+        .attr('fill', 'transparent').style('cursor', 'pointer')
+        .attr('y', 0).attr('height', boxplotYScale.range()[0]) // Full chart height for easy hovering
+        .on('mouseover', function (event, d) {
+            highlightMonsoonYear(d.year, false);
+            showTooltip(event,
+                `<strong>📦 Year ${d.year}</strong><br/>` +
+                `🔺 Max: ${d.max.toFixed(1)} mm<br/>` +
+                `Q3: ${d.q3.toFixed(1)} mm<br/>` +
+                `📍 Median: <b>${d.median.toFixed(1)} mm</b><br/>` +
+                `Q1: ${d.q1.toFixed(1)} mm<br/>` +
+                `🔻 Min: ${d.min.toFixed(1)} mm`);
+        })
+        .on('mousemove', function (event) { moveTooltip(event); })
+        .on('mouseout', function () {
+            hideTooltip();
+            highlightMonsoonYear(null, false);
+        })
+        .merge(overlays).transition().duration(250)
+        .attr('x', d => boxplotXScale(d.year)).attr('width', boxplotXScale.bandwidth());
+    overlays.exit().remove();
+
+    // Reapply focus highlights if a year is currently locked via hover elsewhere
+    if (monsoonFocusYear) {
+        setTimeout(() => highlightMonsoonYear(monsoonFocusYear, false), 50);
+    }
+}
+
+// ==================== CROSS-WIDGET HIGHLIGHT ====================
+// Only used for linking Annual chart (Widget 1) hover with Boxplots (Widget 3)
+let monsoonFocusYear = null;
+function highlightMonsoonYear(year) {
+    monsoonFocusYear = year;
+
+    // --- Boxplot boxes ---
+    d3.selectAll('.rf-iqr-box')
+        .transition().duration(180)
+        .attr('opacity', function () {
+            const yr = +this.getAttribute('data-year');
+            return !year ? 0.22 : (yr === year ? 0.7 : 0.08);
+        })
+        .attr('stroke-width', function () {
+            return +this.getAttribute('data-year') === year ? 2.5 : 1.5;
+        })
+        .attr('stroke', function () {
+            return +this.getAttribute('data-year') === year ? '#fff' : '#00d9ff';
+        });
+
+    d3.selectAll('.rf-whisker')
+        .transition().duration(180)
+        .attr('opacity', function () {
+            const yr = +this.getAttribute('data-year');
+            return !year ? 0.45 : (yr === year ? 1 : 0.08);
+        })
+        .attr('stroke', function () {
+            return +this.getAttribute('data-year') === year ? '#fff' : '#00d9ff';
+        });
+
+    d3.selectAll('.rf-median')
+        .transition().duration(180)
+        .attr('opacity', function () {
+            const yr = +this.getAttribute('data-year');
+            return !year ? 1 : (yr === year ? 1 : 0.12);
+        })
+        .attr('stroke-width', function () {
+            return +this.getAttribute('data-year') === year ? 3 : 2;
+        });
+
+    // --- Widget 1 dots ---
+    d3.selectAll('.dot-vis')
+        .transition().duration(180)
+        .attr('r', function () {
+            return +this.getAttribute('data-year') === year ? 8 : 4;
+        })
+        .attr('fill', function () {
+            return +this.getAttribute('data-year') === year ? '#c77dff' : '#9d4edd';
+        })
+        .attr('opacity', function () {
+            const yr = +this.getAttribute('data-year');
+            return !year ? 1 : (yr === year ? 1 : 0.3);
         });
 }
 
