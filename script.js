@@ -681,7 +681,7 @@ function createMonsoonAnalysis() {
 // FIX 1: Removed red extreme-year dots — all dots now uniform colour
 // The area chart itself already shows peaks/troughs visually
 function createRainfallYearly() {
-    const { svg, width, height } = makeSVG('rainfallYearly', { top: 45, right: 30, bottom: 65, left: 70 }, 520, 0.85);
+    const { svg, width, height } = makeSVG('rainfallYearly', { top: 45, right: 30, bottom: 65, left: 70 }, 520, 0.96);
 
     const data = Array.from(
         d3.rollup(weatherData, v => d3.sum(v, d => d.rainfall), d => d.year),
@@ -734,8 +734,8 @@ function createRainfallYearly() {
             hideTooltip();
         });
     // Compact top-right legend
-    const leg = svg.append('g').attr('transform', `translate(${width - 160}, 8)`);
-    leg.append('rect').attr('width', 158).attr('height', 50).attr('rx', 6)
+    const leg = svg.append('g').attr('transform', `translate(${width - 150}, 8)`);
+    leg.append('rect').attr('width', 118).attr('height', 50).attr('rx', 6)
         .attr('fill', 'rgba(10,14,26,0.7)').attr('stroke', 'rgba(157,78,221,0.4)').attr('stroke-width', 1);
     // Area swatch
     leg.append('rect').attr('x', 10).attr('y', 10).attr('width', 20).attr('height', 10).attr('rx', 2)
@@ -938,6 +938,19 @@ function updateRainfallBoxplot() {
     // Update X Domain
     boxplotXScale.domain(yearlyStats.map(d => d.year));
 
+    // Autoscale Y to visible window
+    const yMin = Math.max(0, d3.min(yearlyStats, d => d.min) * 0.9);
+    const yMax = d3.max(yearlyStats, d => d.max) * 1.1;
+    boxplotYScale.domain([yMin, yMax]);
+
+    // Transition Y Axis
+    boxplotSvgGrp.select('.y-axis').transition().duration(250)
+        .call(d3.axisLeft(boxplotYScale));
+
+    // Update grid lines
+    boxplotSvgGrp.select('.grid').transition().duration(250)
+        .call(d3.axisLeft(boxplotYScale).tickSize(-boxplotXScale.range()[1]).tickFormat(''));
+
     // Transition X Axis
     boxplotSvgGrp.select('.x-axis').transition().duration(250)
         .call(d3.axisBottom(boxplotXScale).tickFormat(d3.format('d')));
@@ -958,7 +971,8 @@ function updateRainfallBoxplot() {
         .merge(whiskers).transition().duration(250)
         .attr('opacity', 0.45)
         .attr('x1', d => boxplotXScale(d.year) + boxplotXScale.bandwidth() / 2)
-        .attr('x2', d => boxplotXScale(d.year) + boxplotXScale.bandwidth() / 2);
+        .attr('x2', d => boxplotXScale(d.year) + boxplotXScale.bandwidth() / 2)
+        .attr('y1', d => boxplotYScale(d.max)).attr('y2', d => boxplotYScale(d.min));
     whiskers.exit().transition().duration(250).attr('opacity', 0).remove();
 
     // ====== TOP CAPS ======
@@ -969,7 +983,8 @@ function updateRainfallBoxplot() {
         .merge(tCaps).transition().duration(250)
         .attr('opacity', 0.45)
         .attr('x1', d => boxplotXScale(d.year) + boxplotXScale.bandwidth() * 0.2)
-        .attr('x2', d => boxplotXScale(d.year) + boxplotXScale.bandwidth() * 0.8);
+        .attr('x2', d => boxplotXScale(d.year) + boxplotXScale.bandwidth() * 0.8)
+        .attr('y1', d => boxplotYScale(d.max)).attr('y2', d => boxplotYScale(d.max));
     tCaps.exit().transition().duration(250).attr('opacity', 0).remove();
 
     // ====== BOTTOM CAPS ======
@@ -980,7 +995,8 @@ function updateRainfallBoxplot() {
         .merge(bCaps).transition().duration(250)
         .attr('opacity', 0.45)
         .attr('x1', d => boxplotXScale(d.year) + boxplotXScale.bandwidth() * 0.2)
-        .attr('x2', d => boxplotXScale(d.year) + boxplotXScale.bandwidth() * 0.8);
+        .attr('x2', d => boxplotXScale(d.year) + boxplotXScale.bandwidth() * 0.8)
+        .attr('y1', d => boxplotYScale(d.min)).attr('y2', d => boxplotYScale(d.min));
     bCaps.exit().transition().duration(250).attr('opacity', 0).remove();
 
     // ====== IQR BOXES ======
@@ -991,7 +1007,8 @@ function updateRainfallBoxplot() {
         .style('pointer-events', 'none')
         .merge(boxes).transition().duration(250)
         .attr('opacity', 0.22)
-        .attr('x', d => boxplotXScale(d.year)).attr('width', boxplotXScale.bandwidth());
+        .attr('x', d => boxplotXScale(d.year)).attr('width', boxplotXScale.bandwidth())
+        .attr('y', d => boxplotYScale(d.q3)).attr('height', d => Math.max(1, boxplotYScale(d.q1) - boxplotYScale(d.q3)));
     boxes.exit().transition().duration(250).attr('opacity', 0).remove();
 
     // ====== MEDIAN LINES ======
@@ -1001,7 +1018,8 @@ function updateRainfallBoxplot() {
         .attr('y1', d => boxplotYScale(d.median)).attr('y2', d => boxplotYScale(d.median))
         .merge(medians).transition().duration(250)
         .attr('opacity', 1)
-        .attr('x1', d => boxplotXScale(d.year)).attr('x2', d => boxplotXScale(d.year) + boxplotXScale.bandwidth());
+        .attr('x1', d => boxplotXScale(d.year)).attr('x2', d => boxplotXScale(d.year) + boxplotXScale.bandwidth())
+        .attr('y1', d => boxplotYScale(d.median)).attr('y2', d => boxplotYScale(d.median));
     medians.exit().transition().duration(250).attr('opacity', 0).remove();
 
     // ====== INTERACTIVE OVERLAYS ======
